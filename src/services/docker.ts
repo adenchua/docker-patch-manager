@@ -1,5 +1,8 @@
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
+import { pipeline } from 'stream/promises';
+import { createGzip } from 'zlib';
+import { createWriteStream } from 'fs';
 import path from 'path';
 import os from 'os';
 import fs from 'fs/promises';
@@ -58,10 +61,32 @@ export async function saveImageAsTar(imageRef: string, destPath: string): Promis
   const dir = path.dirname(destPath);
   await fs.mkdir(dir, { recursive: true });
 
+  const dockerSave = spawn('docker', ['save', imageRef], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const gzip = createGzip();
+  const out = createWriteStream(destPath);
+
+  const stderrChunks: Buffer[] = [];
+  dockerSave.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
+
+  try {
+    await pipeline(dockerSave.stdout, gzip, out);
+  } catch (err) {
+    await fs.unlink(destPath).catch(() => {});
+    const stderrText = Buffer.concat(stderrChunks).toString().trim();
+    throw new Error(`docker save failed for "${imageRef}": ${stderrText || String(err)}`);
+  }
+
   await new Promise<void>((resolve, reject) => {
-    const { exec } = require('child_process');
-    const cmd = `docker save "${imageRef}" | gzip > "${destPath}"`;
-    exec(cmd, (err: Error | null) => (err ? reject(err) : resolve()));
+    dockerSave.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        const stderrText = Buffer.concat(stderrChunks).toString().trim();
+        fs.unlink(destPath).catch(() => {});
+        reject(new Error(`docker save exited with code ${code}: ${stderrText}`));
+      }
+    });
+    dockerSave.on('error', reject);
   });
 }
 

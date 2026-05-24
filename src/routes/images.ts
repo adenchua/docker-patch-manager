@@ -3,6 +3,14 @@ import fs from 'fs/promises';
 import { readManifest, writeManifest, removeImage, tarFilename } from '../services/manifest.js';
 import { ManifestImage } from '../types/index.js';
 
+const NAME_RE = /^[a-zA-Z0-9._\-\/]{1,128}$/;
+const TAG_RE = /^[a-zA-Z0-9._\-]{1,128}$/;
+const REGISTRY_RE = /^[a-zA-Z0-9.\-]+(:\d{1,5})?$/;
+const ARCH_ALLOWLIST = new Set([
+  'linux/amd64', 'linux/arm64', 'linux/arm/v7',
+  'linux/arm/v6', 'linux/386', 'linux/ppc64le', 'linux/s390x',
+]);
+
 const router = Router();
 
 router.get('/', async (_req: Request, res: Response) => {
@@ -15,6 +23,23 @@ router.post('/', async (req: Request, res: Response) => {
 
   if (!name || !tag || !registry || !architecture) {
     res.status(400).json({ error: 'name, tag, registry, and architecture are required' });
+    return;
+  }
+
+  if (!NAME_RE.test(name)) {
+    res.status(400).json({ error: 'name contains invalid characters' });
+    return;
+  }
+  if (!TAG_RE.test(tag)) {
+    res.status(400).json({ error: 'tag contains invalid characters' });
+    return;
+  }
+  if (!REGISTRY_RE.test(registry)) {
+    res.status(400).json({ error: 'registry format is invalid' });
+    return;
+  }
+  if (!ARCH_ALLOWLIST.has(architecture)) {
+    res.status(400).json({ error: `architecture must be one of: ${[...ARCH_ALLOWLIST].join(', ')}` });
     return;
   }
 
