@@ -13,6 +13,7 @@ const logger = createLogger('docker');
 
 const execFileAsync = promisify(execFile);
 
+
 export async function pullImage(image: Image): Promise<void> {
   const ref = `${image.registry}/${image.name}:${image.tag}`;
   await execFileAsync('docker', ['pull', '--platform', image.architecture, ref]);

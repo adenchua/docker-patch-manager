@@ -1,0 +1,9 @@
+# Exclude everything by default
+*
+
+# Allow only what the Dockerfile needs
+!package.json
+!package-lock.json
+!tsconfig.json
+!src/
+!src/**

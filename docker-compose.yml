@@ -1,6 +1,9 @@
 services:
   patch-manager:
-    build: .
+    build:
+      context: .
+      args:
+        COPA_VERSION: ${COPA_VERSION:-0.14.1}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./database:/app/database

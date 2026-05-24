@@ -1,4 +1,4 @@
-FROM node:22.20.1-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 COPY package*.json tsconfig.json ./
@@ -6,7 +6,7 @@ RUN npm ci
 COPY src/ ./src/
 RUN npm run build
 
-FROM node:22.20.1-alpine
+FROM node:24-alpine
 
 ARG COPA_VERSION=0.14.1
 ARG TARGETARCH=amd64
