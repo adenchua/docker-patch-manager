@@ -1,9 +1,16 @@
 services:
+  buildkitd:
+    image: moby/buildkit:latest
+    privileged: true
+    restart: unless-stopped
+    command: --addr tcp://0.0.0.0:1234
+
   patch-manager:
     build:
       context: .
       args:
         COPA_VERSION: ${COPA_VERSION:-0.14.1}
+    privileged: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./database:/app/database
@@ -12,6 +19,10 @@ services:
       PORT: '5432'
       PATCH_SCHEDULE: '0 2 * * *'
       PATCH_CONCURRENCY: '3'
+      COPA_TIMEOUT: ${COPA_TIMEOUT:-10m}
+      COPA_BUILDKIT_ADDR: tcp://buildkitd:1234
+    depends_on:
+      - buildkitd
     ports:
       - '${PORT:-5432}:${PORT:-5432}'
     restart: unless-stopped

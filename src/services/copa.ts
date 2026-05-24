@@ -8,6 +8,7 @@ const logger = createLogger('copa');
 const execFileAsync = promisify(execFile);
 
 const COPA_TIMEOUT = process.env.COPA_TIMEOUT ?? '10m';
+const COPA_BUILDKIT_ADDR = process.env.COPA_BUILDKIT_ADDR;
 
 export interface CopaResult {
   patchedRef: string;
@@ -22,8 +23,11 @@ export async function patchWithCopa(image: Image, trivyReportPath: string): Prom
   logger.info('Copa patch started', { source: sourceRef, target: patchedRef });
   const copaStart = Date.now();
 
+  const copaArgs = ['patch', '-i', sourceRef, '-r', trivyReportPath, '-t', patchedTag, '--timeout', COPA_TIMEOUT];
+  if (COPA_BUILDKIT_ADDR) copaArgs.push('--addr', COPA_BUILDKIT_ADDR);
+
   try {
-    await execFileAsync('copa', ['patch', '-i', sourceRef, '-r', trivyReportPath, '-t', patchedTag, '--timeout', COPA_TIMEOUT]);
+    await execFileAsync('copa', copaArgs);
     logger.info('Copa patch complete', { patchedRef, durationMs: Date.now() - copaStart });
     return { patchedRef, fullyPatched: true };
   } catch (err: unknown) {
@@ -35,7 +39,7 @@ export async function patchWithCopa(image: Image, trivyReportPath: string): Prom
       return { patchedRef: sourceRef, fullyPatched: false };
     }
 
-    if (message.includes('Operation Timed Out') || message.includes('patch exceeded timeout')) {
+    if (message.includes('Operation Timed Out') || message.includes('patch exceeded timeout') || message.includes('context canceled')) {
       logger.error('Copa patch timed out', { source: sourceRef, timeout: COPA_TIMEOUT, durationMs: Date.now() - copaStart });
       throw new Error(`Copa timed out (${COPA_TIMEOUT}) for ${sourceRef}`);
     }

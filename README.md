@@ -36,6 +36,12 @@ Images that only contain language-level vulnerabilities (npm, pip, etc.) that Co
 docker compose up --build
 ```
 
+### Docker Desktop (macOS / Windows)
+
+The `docker-compose.yml` includes a dedicated `buildkitd` sidecar that Copa uses for patching (`COPA_BUILDKIT_ADDR=tcp://buildkitd:1234`). This is needed on macOS Docker Desktop, where the built-in BuildKit stalls when Copa tries to apply OS-level patches inside container layers. Windows Docker Desktop may work without it (WSL2 uses a real Linux kernel with no Rosetta translation), but the sidecar is kept as a safe default.
+
+On a native Linux host the sidecar is unnecessary — remove the `buildkitd` service and the `COPA_BUILDKIT_ADDR` environment variable and Copa will use the Docker daemon's built-in BuildKit directly.
+
 The API is available at `http://localhost:5432`. Interactive API docs at `http://localhost:5432/docs`.
 
 Patched image tars are written to `./output/` on the host, organized by architecture. The database is stored in `./database/`.
