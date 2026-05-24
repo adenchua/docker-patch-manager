@@ -7,6 +7,7 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs/promises';
 import { ManifestImage, VulnerabilityCounts } from '../types/index.js';
+import logger from '../logger.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -23,6 +24,9 @@ export interface TrivyResult {
 export async function runTrivy(image: ManifestImage): Promise<TrivyResult> {
   const ref = `${image.registry}/${image.name}:${image.tag}`;
   const reportPath = path.join(os.tmpdir(), `trivy-${image.name.replace(/\//g, '_')}-${image.tag}.json`);
+
+  logger.info('Trivy scan started', { image: ref });
+  const trivyStart = Date.now();
 
   await execFileAsync('docker', [
     'run',
@@ -53,6 +57,8 @@ export async function runTrivy(image: ManifestImage): Promise<TrivyResult> {
       else if (sev === 'low') counts.low++;
     }
   }
+
+  logger.info('Trivy scan complete', { image: ref, vulnerabilities: counts, durationMs: Date.now() - trivyStart });
 
   return { vulnerabilities: counts, reportPath };
 }

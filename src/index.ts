@@ -7,21 +7,24 @@ import imagesRouter from './routes/images.js';
 import scanRouter from './routes/scan.js';
 import { startScheduler } from './services/scheduler.js';
 import { openApiSpec } from './openapi.js';
+import logger from './logger.js';
 
 const app = express();
 const port = process.env.PORT ?? 5432;
-const ALLOWED_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:3000';
+const ALLOWED_ORIGIN = process.env.CORS_ORIGIN ?? `http://localhost:${port}`;
 
 // 1. Security headers
 app.use(helmet());
 
 // 2. CORS
-app.use(cors({
-  origin: ALLOWED_ORIGIN,
-  methods: ['GET', 'POST', 'DELETE'],
-  allowedHeaders: ['Content-Type'],
-  credentials: false,
-}));
+app.use(
+  cors({
+    origin: ALLOWED_ORIGIN,
+    methods: ['GET', 'POST', 'DELETE'],
+    allowedHeaders: ['Content-Type'],
+    credentials: false,
+  })
+);
 
 // 3. Body parsing with size cap
 app.use(express.json({ limit: '10kb' }));
@@ -45,14 +48,16 @@ app.use('/scan', scanLimiter);
 
 // 5. Routes
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
-app.get('/health', (_req, res) => { res.send('OK'); });
+app.get('/health', (_req, res) => {
+  res.send('OK');
+});
 app.use('/images', imagesRouter);
 app.use('/scan', scanRouter);
 
 // 6. Global error handler — must be last, must have 4 params
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  console.error(err);
+  logger.error('Unhandled request error', { err: String(err) });
   const status =
     err instanceof Error && 'status' in err && typeof (err as { status: unknown }).status === 'number'
       ? (err as { status: number }).status
@@ -62,14 +67,14 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 // 7. Process-level safety nets
 process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled rejection:', reason);
+  logger.error('Unhandled rejection', { reason: String(reason) });
 });
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught exception:', err);
+  logger.error('Uncaught exception', { err: String(err) });
   process.exit(1);
 });
 
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+  logger.info('Server running', { port });
   startScheduler();
 });

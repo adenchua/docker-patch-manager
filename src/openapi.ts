@@ -8,7 +8,7 @@ export const openApiSpec: OpenAPIV3.Document = {
     description:
       'Manages Docker images: downloads them from public registries, scans for vulnerabilities with Trivy, patches OS-level vulnerabilities with Copa, and saves patched images as tar files for offline deployment.',
   },
-  servers: [{ url: 'http://localhost:3000', description: 'Local' }],
+  servers: [{ url: 'http://localhost:5432', description: 'Local' }],
   tags: [
     { name: 'Images', description: 'Manage the image manifest' },
     { name: 'Scan', description: 'Trigger and monitor patch cycles' },
@@ -20,7 +20,10 @@ export const openApiSpec: OpenAPIV3.Document = {
         tags: ['Health'],
         summary: 'Health check',
         responses: {
-          '200': { description: 'Service is running', content: { 'text/plain': { schema: { type: 'string', example: 'OK' } } } },
+          '200': {
+            description: 'Service is running',
+            content: { 'text/plain': { schema: { type: 'string', example: 'OK' } } },
+          },
         },
       },
     },
@@ -31,7 +34,9 @@ export const openApiSpec: OpenAPIV3.Document = {
         responses: {
           '200': {
             description: 'Array of all images in the manifest',
-            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/ManifestImage' } } } },
+            content: {
+              'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/ManifestImage' } } },
+            },
           },
         },
       },
@@ -47,8 +52,14 @@ export const openApiSpec: OpenAPIV3.Document = {
             description: 'Image added successfully',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/ManifestImage' } } },
           },
-          '400': { description: 'Missing required fields', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
-          '409': { description: 'Image already exists', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '400': {
+            description: 'Missing required fields',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
+          '409': {
+            description: 'Image already exists',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
         },
       },
     },
@@ -56,7 +67,8 @@ export const openApiSpec: OpenAPIV3.Document = {
       delete: {
         tags: ['Images'],
         summary: 'Remove an image from the manifest',
-        description: 'Removes the image entry from the manifest and deletes its tar file from the data volume if present.',
+        description:
+          'Removes the image entry from the manifest and deletes its tar file from the data volume if present.',
         parameters: [
           {
             name: 'name',
@@ -68,7 +80,10 @@ export const openApiSpec: OpenAPIV3.Document = {
         ],
         responses: {
           '204': { description: 'Image removed successfully' },
-          '404': { description: 'Image not found', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': {
+            description: 'Image not found',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
         },
       },
     },
@@ -76,10 +91,17 @@ export const openApiSpec: OpenAPIV3.Document = {
       post: {
         tags: ['Scan'],
         summary: 'Trigger an immediate patch cycle',
-        description: 'Starts a full scan-and-patch cycle across all images in the manifest. No-op if a cycle is already running.',
+        description:
+          'Starts a full scan-and-patch cycle across all images in the manifest. No-op if a cycle is already running.',
         responses: {
-          '202': { description: 'Patch cycle started', content: { 'application/json': { schema: { $ref: '#/components/schemas/MessageResponse' } } } },
-          '409': { description: 'A patch cycle is already running', content: { 'application/json': { schema: { $ref: '#/components/schemas/MessageResponse' } } } },
+          '202': {
+            description: 'Patch cycle started',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/MessageResponse' } } },
+          },
+          '409': {
+            description: 'A patch cycle is already running',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/MessageResponse' } } },
+          },
         },
       },
     },
@@ -127,7 +149,17 @@ export const openApiSpec: OpenAPIV3.Document = {
           lastPatched: { type: 'string', format: 'date-time', nullable: true },
           vulnerabilities: { allOf: [{ $ref: '#/components/schemas/VulnerabilityCounts' }], nullable: true },
         },
-        required: ['name', 'tag', 'registry', 'architecture', 'status', 'tarPath', 'lastScanned', 'lastPatched', 'vulnerabilities'],
+        required: [
+          'name',
+          'tag',
+          'registry',
+          'architecture',
+          'status',
+          'tarPath',
+          'lastScanned',
+          'lastPatched',
+          'vulnerabilities',
+        ],
       },
       AddImageRequest: {
         type: 'object',
@@ -155,7 +187,12 @@ export const openApiSpec: OpenAPIV3.Document = {
         type: 'object',
         properties: {
           state: { type: 'string', enum: ['idle', 'running'] },
-          progress: { type: 'string', nullable: true, example: '3/12', description: 'Completed/total images in the current run' },
+          progress: {
+            type: 'string',
+            nullable: true,
+            example: '3/12',
+            description: 'Completed/total images in the current run',
+          },
           lastRun: { allOf: [{ $ref: '#/components/schemas/LastRunSummary' }], nullable: true },
         },
         required: ['state', 'progress', 'lastRun'],

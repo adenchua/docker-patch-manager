@@ -36,37 +36,37 @@ Images that only contain language-level vulnerabilities (npm, pip, etc.) that Co
 docker compose up --build
 ```
 
-The API is available at `http://localhost:3000`. Interactive API docs at `http://localhost:3000/docs`.
+The API is available at `http://localhost:5432`. Interactive API docs at `http://localhost:5432/docs`.
 
 Patched image tars and the manifest are written to `./data/` on the host.
 
 ## Configuration
 
-| Variable | Default | Description |
-|---|---|---|
-| `PORT` | `3000` | HTTP server port |
-| `PATCH_SCHEDULE` | `0 2 * * *` | Cron expression for automatic patch cycles (daily at 2am) |
-| `PATCH_CONCURRENCY` | `3` | Max images processed simultaneously |
-| `DATA_DIR` | `/data` | Mount path for manifest and image tars |
+| Variable            | Default     | Description                                               |
+| ------------------- | ----------- | --------------------------------------------------------- |
+| `PORT`              | `5432`      | HTTP server port                                          |
+| `PATCH_SCHEDULE`    | `0 2 * * *` | Cron expression for automatic patch cycles (daily at 2am) |
+| `PATCH_CONCURRENCY` | `3`         | Max images processed simultaneously                       |
+| `DATA_DIR`          | `/data`     | Mount path for manifest and image tars                    |
 
 Copy `.env.example` to `.env` and adjust values before running outside Docker Compose.
 
 ## API Reference
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/images` | List all images in the manifest |
-| `POST` | `/images` | Add an image to the manifest |
-| `DELETE` | `/images/:name` | Remove an image and delete its tar |
-| `POST` | `/scan` | Trigger an immediate scan-and-patch cycle |
-| `GET` | `/scan/status` | Current job state, progress, and last run summary |
-| `GET` | `/health` | Health check |
-| `GET` | `/docs` | Swagger UI (full OpenAPI 3.0 spec) |
+| Method   | Path            | Description                                       |
+| -------- | --------------- | ------------------------------------------------- |
+| `GET`    | `/images`       | List all images in the manifest                   |
+| `POST`   | `/images`       | Add an image to the manifest                      |
+| `DELETE` | `/images/:name` | Remove an image and delete its tar                |
+| `POST`   | `/scan`         | Trigger an immediate scan-and-patch cycle         |
+| `GET`    | `/scan/status`  | Current job state, progress, and last run summary |
+| `GET`    | `/health`       | Health check                                      |
+| `GET`    | `/docs`         | Swagger UI (full OpenAPI 3.0 spec)                |
 
 ### Add an image
 
 ```bash
-curl -X POST http://localhost:3000/images \
+curl -X POST http://localhost:5432/images \
   -H 'Content-Type: application/json' \
   -d '{"name":"nginx","tag":"1.27","registry":"docker.io","architecture":"linux/amd64"}'
 ```
@@ -74,13 +74,13 @@ curl -X POST http://localhost:3000/images \
 ### Trigger a patch cycle
 
 ```bash
-curl -X POST http://localhost:3000/scan
+curl -X POST http://localhost:5432/scan
 ```
 
 ### Check progress
 
 ```bash
-curl http://localhost:3000/scan/status
+curl http://localhost:5432/scan/status
 ```
 
 ## Data Volume
@@ -101,10 +101,10 @@ docker load -i nginx_1.27.tgz
 
 ## Tools Used
 
-| Tool | Role |
-|---|---|
-| [Trivy](https://github.com/aquasecurity/trivy) | Vulnerability scanning (runs as ephemeral Docker container) |
-| [Copa](https://github.com/project-copacetic/copacetic) | OS-level package patching (binary bundled in image) |
-| [node-cron](https://github.com/node-cron/node-cron) | Scheduled patch cycles |
-| [p-limit](https://github.com/sindresorhus/p-limit) | Concurrency control for parallel image processing |
-| [swagger-ui-express](https://github.com/scottie1984/swagger-ui-express) | Interactive API documentation |
+| Tool                                                                    | Role                                                        |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------- |
+| [Trivy](https://github.com/aquasecurity/trivy)                          | Vulnerability scanning (runs as ephemeral Docker container) |
+| [Copa](https://github.com/project-copacetic/copacetic)                  | OS-level package patching (binary bundled in image)         |
+| [node-cron](https://github.com/node-cron/node-cron)                     | Scheduled patch cycles                                      |
+| [p-limit](https://github.com/sindresorhus/p-limit)                      | Concurrency control for parallel image processing           |
+| [swagger-ui-express](https://github.com/scottie1984/swagger-ui-express) | Interactive API documentation                               |

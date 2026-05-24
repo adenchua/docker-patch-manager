@@ -4,6 +4,7 @@ import { ManifestImage } from '../types/index.js';
 import { updateImage, tarFilename, ensureImagesDir } from './manifest.js';
 import { pullImage, runTrivy, saveImageAsTar, removeLocalImage } from './docker.js';
 import { patchWithCopa } from './copa.js';
+import logger from '../logger.js';
 
 export async function patchImage(image: ManifestImage): Promise<ManifestImage> {
   await ensureImagesDir();
@@ -16,6 +17,7 @@ export async function patchImage(image: ManifestImage): Promise<ManifestImage> {
   try {
     // 1. Download
     await updateImage(set('downloading'));
+    logger.info('Pulling image', { image: `${image.registry}/${image.name}:${image.tag}` });
     await pullImage(image);
 
     // 2. Scan
@@ -46,9 +48,16 @@ export async function patchImage(image: ManifestImage): Promise<ManifestImage> {
       lastPatched: now,
       vulnerabilities,
     };
+    logger.info('Patch cycle complete', {
+      image: `${image.registry}/${image.name}:${image.tag}`,
+      status: image.status,
+      vulnerabilities: image.vulnerabilities,
+      tarPath: image.tarPath,
+    });
     await updateImage(image);
     return image;
   } catch (err) {
+    logger.error('Patch cycle failed', { image: `${image.registry}/${image.name}:${image.tag}`, err: String(err) });
     image = { ...image, status: 'failed' };
     await updateImage(image);
     throw err;

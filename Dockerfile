@@ -13,7 +13,7 @@ ARG TARGETARCH=amd64
 
 RUN apk add --no-cache wget tar docker-cli \
   && wget -qO /tmp/copa.tar.gz \
-    "https://github.com/project-copacetic/copacetic/releases/download/v${COPA_VERSION}/copa_${COPA_VERSION}_linux_${TARGETARCH}.tar.gz" \
+  "https://github.com/project-copacetic/copacetic/releases/download/v${COPA_VERSION}/copa_${COPA_VERSION}_linux_${TARGETARCH}.tar.gz" \
   && tar -xzf /tmp/copa.tar.gz -C /usr/local/bin copa \
   && chmod +x /usr/local/bin/copa \
   && rm /tmp/copa.tar.gz
@@ -26,6 +26,6 @@ COPY --from=builder /app/dist ./dist
 
 VOLUME /data
 
-EXPOSE 3000
+EXPOSE 5432
 
 CMD ["node", "dist/index.js"]
