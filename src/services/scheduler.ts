@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import pLimit from 'p-limit';
-import { getAllImages } from './database.js';
+import { getAllImages, clearOutputDir } from './database.js';
 import { patchImage } from './patcher.js';
 import { JobStatus, LastRunSummary } from '../types/index.js';
 import { createLogger } from '../logger.js';
@@ -25,6 +25,9 @@ export async function runPatchCycle(): Promise<boolean> {
   const summary = { patched: 0, unpatchable: 0, failed: 0, total: 0 };
 
   try {
+    await clearOutputDir();
+    logger.info('Output directory cleared');
+
     const allImages = await getAllImages();
     const images = allImages.filter(
       (img) => img.status !== 'downloading' && img.status !== 'scanning' && img.status !== 'patching'

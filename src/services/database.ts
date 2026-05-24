@@ -203,6 +203,18 @@ export async function removeImage(
   return existing;
 }
 
+export async function clearOutputDir(): Promise<void> {
+  const entries = await fs.readdir(OUTPUT_DIR, { withFileTypes: true });
+  await Promise.all(
+    entries
+      .filter((e) => e.name !== '.gitkeep')
+      .map((e) => {
+        const full = path.join(OUTPUT_DIR, e.name);
+        return e.isDirectory() ? fs.rm(full, { recursive: true }) : fs.unlink(full);
+      })
+  );
+}
+
 export function outputPath(image: Image): string {
   const archFolder = image.architecture.replace(/\//g, '-');
   const safeName = image.name.replace(/\//g, '_');
