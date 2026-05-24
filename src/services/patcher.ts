@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { ManifestImage } from '../types/index.js';
 import { updateImage, tarFilename, ensureImagesDir } from './manifest.js';
-import { pullImage, runTrivy, saveImageAsTar, removeLocalImage } from './docker.js';
+import { pullImage, runTrivy, runTrivyOnRef, saveImageAsTar, removeLocalImage } from './docker.js';
 import { patchWithCopa } from './copa.js';
 import logger from '../logger.js';
 
@@ -32,6 +32,17 @@ export async function patchImage(image: ManifestImage): Promise<ManifestImage> {
     // 3. Patch
     await updateImage(set('patching'));
     const { patchedRef, fullyPatched } = await patchWithCopa(image, reportPath);
+
+    // 3b. Re-scan patched image to reflect updated vulnerability counts
+    if (fullyPatched) {
+      try {
+        const patchedVulnerabilities = await runTrivyOnRef(patchedRef);
+        image = { ...image, vulnerabilities: patchedVulnerabilities, lastScanned: new Date().toISOString() };
+        await updateImage(image);
+      } catch (err) {
+        logger.warn('Post-patch Trivy scan failed — keeping pre-patch counts', { image: patchedRef, err: String(err) });
+      }
+    }
 
     // 4. Save tar
     const tarPath = tarFilename(image);

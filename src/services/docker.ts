@@ -59,6 +59,32 @@ export async function runTrivy(image: ManifestImage): Promise<TrivyResult> {
   return { vulnerabilities: counts, reportPath };
 }
 
+export async function runTrivyOnRef(imageRef: string): Promise<VulnerabilityCounts> {
+  logger.info('Trivy post-patch scan started', { image: imageRef });
+  const start = Date.now();
+
+  const { stdout } = await execFileAsync('docker', [
+    'run', '--rm',
+    '-v', '/var/run/docker.sock:/var/run/docker.sock',
+    'aquasec/trivy', 'image', '--format', 'json', imageRef,
+  ], { maxBuffer: 50 * 1024 * 1024 });
+
+  const report = JSON.parse(stdout);
+  const counts: VulnerabilityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+  for (const result of report.Results ?? []) {
+    for (const vuln of result.Vulnerabilities ?? []) {
+      const sev = (vuln.Severity as string).toLowerCase();
+      if (sev === 'critical') counts.critical++;
+      else if (sev === 'high') counts.high++;
+      else if (sev === 'medium') counts.medium++;
+      else if (sev === 'low') counts.low++;
+    }
+  }
+
+  logger.info('Trivy post-patch scan complete', { image: imageRef, vulnerabilities: counts, durationMs: Date.now() - start });
+  return counts;
+}
+
 export async function saveImageAsTar(imageRef: string, destPath: string): Promise<void> {
   const dir = path.dirname(destPath);
   await fs.mkdir(dir, { recursive: true });
