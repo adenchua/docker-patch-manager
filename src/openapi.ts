@@ -122,6 +122,33 @@ export const openApiSpec: OpenAPIV3.Document = {
         },
       },
     },
+    '/images/cleanup': {
+      post: {
+        tags: ['Images'],
+        summary: 'Delete superseded image versions',
+        description:
+          'Groups images by name, registry, architecture, semver major version, and tag suffix, then deletes all but the highest version in each group. Images in an active state (downloading, scanning, patching) are never deleted. Use `?dryRun=true` to preview what would be removed without making any changes.',
+        parameters: [
+          {
+            name: 'dryRun',
+            in: 'query',
+            required: false,
+            description: 'If true, return the list of images that would be deleted without deleting anything.',
+            schema: { type: 'boolean', default: false },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Cleanup result',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/CleanupResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
     '/scan': {
       post: {
         tags: ['Scan'],
@@ -233,6 +260,15 @@ export const openApiSpec: OpenAPIV3.Document = {
           lastRun: { allOf: [{ $ref: '#/components/schemas/LastRunSummary' }], nullable: true },
         },
         required: ['state', 'progress', 'lastRun'],
+      },
+      CleanupResponse: {
+        type: 'object',
+        properties: {
+          dryRun: { type: 'boolean', example: false },
+          count: { type: 'integer', example: 3, description: 'Number of images deleted (or that would be deleted)' },
+          images: { type: 'array', items: { $ref: '#/components/schemas/ManifestImage' } },
+        },
+        required: ['dryRun', 'count', 'images'],
       },
       ErrorResponse: {
         type: 'object',

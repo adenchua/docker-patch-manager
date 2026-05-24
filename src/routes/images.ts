@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs/promises';
+import semver from 'semver';
 import { getAllImages, getImage, upsertImage, removeImageById, getImageById, outputPath } from '../services/database.js';
 import { patchImage } from '../services/patcher.js';
 import { Image, ImageStatus } from '../types/index.js';
@@ -90,6 +91,50 @@ router.delete('/:id', async (req: Request, res: Response) => {
 });
 
 const BUSY_STATUSES = new Set<ImageStatus>(['downloading', 'scanning', 'patching']);
+
+function parseTag(tag: string): { version: semver.SemVer; suffix: string } | null {
+  const match = tag.match(/^(\d[\d.]*)(-.+)?$/);
+  if (!match) return null;
+  const coerced = semver.coerce(match[1]);
+  if (!coerced) return null;
+  return { version: coerced, suffix: match[2] ?? '' };
+}
+
+router.post('/cleanup', async (req: Request, res: Response) => {
+  const dryRun = req.query['dryRun'] === 'true';
+  const allImages = await getAllImages();
+
+  const groups = new Map<string, Array<{ image: Image; parsed: semver.SemVer }>>();
+  for (const image of allImages) {
+    const parsed = parseTag(image.tag);
+    if (!parsed) continue;
+    const key = `${image.name}|${image.registry}|${image.architecture}|${parsed.version.major}|${parsed.suffix}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push({ image, parsed: parsed.version });
+  }
+
+  const toDelete: Image[] = [];
+  for (const entries of groups.values()) {
+    if (entries.length < 2) continue;
+    entries.sort((a, b) => semver.rcompare(a.parsed, b.parsed));
+    const [, ...candidates] = entries;
+    for (const { image } of candidates) {
+      if (!BUSY_STATUSES.has(image.status)) toDelete.push(image);
+    }
+  }
+
+  if (dryRun) {
+    res.status(200).json({ dryRun: true, count: toDelete.length, images: toDelete });
+    return;
+  }
+
+  for (const image of toDelete) {
+    await removeImageById(image.id!);
+    await fs.unlink(outputPath(image)).catch(() => {});
+  }
+
+  res.status(200).json({ dryRun: false, count: toDelete.length, images: toDelete });
+});
 
 router.post('/:id/scan', async (req: Request, res: Response) => {
   const id = parseInt(req.params['id'] as string, 10);
