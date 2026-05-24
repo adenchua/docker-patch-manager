@@ -1,7 +1,9 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { Image } from '../types/index.js';
-import logger from '../logger.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('copa');
 
 const execFileAsync = promisify(execFile);
 

@@ -3,7 +3,9 @@ import fs from 'fs/promises';
 import { getAllImages, getImage, upsertImage, removeImageById, getImageById, outputPath } from '../services/database.js';
 import { patchImage } from '../services/patcher.js';
 import { Image, ImageStatus } from '../types/index.js';
-import logger from '../logger.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('images');
 
 const NAME_RE = /^[a-zA-Z0-9._\-\/]{1,128}$/;
 const TAG_RE = /^[a-zA-Z0-9._\-]{1,128}$/;

@@ -8,7 +8,9 @@ import scanRouter from './routes/scan.js';
 import { startScheduler } from './services/scheduler.js';
 import { initDatabase } from './services/database.js';
 import { openApiSpec } from './openapi.js';
-import logger from './logger.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('app');
 
 const app = express();
 const port = process.env.PORT ?? 5432;

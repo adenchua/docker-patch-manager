@@ -7,7 +7,9 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs/promises';
 import { Image, VulnerabilityCounts } from '../types/index.js';
-import logger from '../logger.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('docker');
 
 const execFileAsync = promisify(execFile);
 

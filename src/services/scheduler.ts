@@ -3,7 +3,9 @@ import pLimit from 'p-limit';
 import { getAllImages } from './database.js';
 import { patchImage } from './patcher.js';
 import { JobStatus, LastRunSummary } from '../types/index.js';
-import logger from '../logger.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('scheduler');
 
 const PATCH_SCHEDULE = process.env.PATCH_SCHEDULE ?? '0 2 * * *';
 const PATCH_CONCURRENCY = parseInt(process.env.PATCH_CONCURRENCY ?? '3', 10);

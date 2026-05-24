@@ -3,7 +3,9 @@ import { Image } from '../types/index.js';
 import { updateImage, outputPath, ensureOutputDir } from './database.js';
 import { pullImage, runTrivy, runTrivyOnRef, saveImageAsTar, removeLocalImage } from './docker.js';
 import { patchWithCopa } from './copa.js';
-import logger from '../logger.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('patcher');
 
 export async function patchImage(image: Image): Promise<Image> {
   await ensureOutputDir(image);
