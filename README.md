@@ -47,21 +47,24 @@ Patched image tars are written to `./output/` on the host, organized by architec
 | `PORT`              | `5432`      | HTTP server port                                          |
 | `PATCH_SCHEDULE`    | `0 2 * * *` | Cron expression for automatic patch cycles (daily at 2am) |
 | `PATCH_CONCURRENCY` | `3`         | Max images processed simultaneously                       |
-| `COPA_TIMEOUT`      | `10m`       | Timeout for each Copa patch operation                     |
+| `COPA_TIMEOUT`      | `30m`       | Timeout for each Copa patch operation                     |
+| `CORS_ORIGIN`       | `http://localhost:5432` | Allowed CORS origin for API requests             |
 
 Copy `.env.example` to `.env` and adjust values before running outside Docker Compose.
 
 ## API Reference
 
-| Method   | Path            | Description                                       |
-| -------- | --------------- | ------------------------------------------------- |
-| `GET`    | `/images`       | List all images in the manifest                   |
-| `POST`   | `/images`       | Add an image to the manifest                      |
-| `DELETE` | `/images/:name?tag=&registry=&architecture=` | Remove an image and delete its tar |
-| `POST`   | `/scan`         | Trigger an immediate scan-and-patch cycle         |
-| `GET`    | `/scan/status`  | Current job state, progress, and last run summary |
-| `GET`    | `/health`       | Health check                                      |
-| `GET`    | `/docs`         | Swagger UI (full OpenAPI 3.0 spec)                |
+| Method   | Path                  | Description                                                          |
+| -------- | --------------------- | -------------------------------------------------------------------- |
+| `GET`    | `/images`             | List all images in the manifest                                      |
+| `POST`   | `/images`             | Add an image to the manifest                                         |
+| `DELETE` | `/images/:id`         | Remove an image and delete its tar                                   |
+| `POST`   | `/images/:id/scan`    | Trigger an ad-hoc scan-and-patch cycle for a single image            |
+| `POST`   | `/images/cleanup`     | Delete superseded minor/patch versions, keeping the latest per group |
+| `POST`   | `/scan`               | Trigger an immediate scan-and-patch cycle                            |
+| `GET`    | `/scan/status`        | Current job state, progress, and last run summary                    |
+| `GET`    | `/health`             | Health check                                                         |
+| `GET`    | `/docs`               | Swagger UI (full OpenAPI 3.0 spec)                                   |
 
 ### Add an image
 
@@ -69,6 +72,12 @@ Copy `.env.example` to `.env` and adjust values before running outside Docker Co
 curl -X POST http://localhost:5432/images \
   -H 'Content-Type: application/json' \
   -d '{"name":"nginx","tag":"1.27","registry":"docker.io","architecture":"linux/amd64"}'
+```
+
+### Scan a single image
+
+```bash
+curl -X POST http://localhost:5432/images/1/scan
 ```
 
 ### Trigger a patch cycle
@@ -82,6 +91,22 @@ curl -X POST http://localhost:5432/scan
 ```bash
 curl http://localhost:5432/scan/status
 ```
+
+### Clean up old image versions
+
+Preview what would be deleted (dry run):
+
+```bash
+curl -X POST 'http://localhost:5432/images/cleanup?dryRun=true'
+```
+
+Delete superseded versions (keeps the highest semver per name/registry/architecture/major/suffix group):
+
+```bash
+curl -X POST http://localhost:5432/images/cleanup
+```
+
+Returns `{ dryRun, count, images }` — the list of images that were (or would be) removed.
 
 ## Data Layout
 
