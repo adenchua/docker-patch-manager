@@ -37,6 +37,7 @@ function all<T>(sql: string, params: unknown[] = []): Promise<T[]> {
 }
 
 interface ImageRow {
+  id: number;
   name: string;
   tag: string;
   registry: string;
@@ -67,6 +68,7 @@ function rowToImage(row: ImageRow): Image {
     : null;
 
   return {
+    id: row.id,
     name: row.name,
     tag: row.tag,
     registry: row.registry,
@@ -123,6 +125,18 @@ export async function getImage(
     [name, tag, registry, architecture]
   );
   return row ? rowToImage(row) : null;
+}
+
+export async function getImageById(id: number): Promise<Image | null> {
+  const row = await get<ImageRow>('SELECT * FROM images WHERE id = ?', [id]);
+  return row ? rowToImage(row) : null;
+}
+
+export async function removeImageById(id: number): Promise<Image | null> {
+  const existing = await getImageById(id);
+  if (!existing) return null;
+  await run('DELETE FROM images WHERE id = ?', [id]);
+  return existing;
 }
 
 export async function upsertImage(image: Image): Promise<void> {

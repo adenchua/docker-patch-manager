@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs/promises';
-import { getAllImages, getImage, upsertImage, removeImage, outputPath } from '../services/database.js';
+import { getAllImages, getImage, upsertImage, removeImageById, getImageById, outputPath } from '../services/database.js';
 import { patchImage } from '../services/patcher.js';
-import { Image } from '../types/index.js';
+import { Image, ImageStatus } from '../types/index.js';
 import logger from '../logger.js';
 
 const NAME_RE = /^[a-zA-Z0-9._\-\/]{1,128}$/;
@@ -63,31 +63,54 @@ router.post('/', async (req: Request, res: Response) => {
   };
 
   await upsertImage(newImage);
-  res.status(201).json(newImage);
-  patchImage(newImage).catch((err) =>
-    logger.warn('Background patch failed', { image: `${newImage.registry}/${newImage.name}:${newImage.tag}`, err: String(err) })
+  const savedImage = (await getImage(name, tag, registry, architecture))!;
+  res.status(201).json(savedImage);
+  patchImage(savedImage).catch((err) =>
+    logger.warn('Background patch failed', { image: `${savedImage.registry}/${savedImage.name}:${savedImage.tag}`, err: String(err) })
   );
 });
 
-router.delete('/:name', async (req: Request, res: Response) => {
-  const name = req.params['name'] as string;
-  const { tag, registry, architecture } = req.query as Record<string, string | undefined>;
-
-  if (!tag || !registry || !architecture) {
-    res.status(400).json({ error: 'tag, registry, and architecture query params are required' });
+router.delete('/:id', async (req: Request, res: Response) => {
+  const id = parseInt(req.params['id'] as string, 10);
+  if (isNaN(id) || id <= 0) {
+    res.status(400).json({ error: 'id must be a positive integer' });
     return;
   }
 
-  const removed = await removeImage(name, tag, registry, architecture);
-
+  const removed = await removeImageById(id);
   if (!removed) {
     res.status(404).json({ error: 'Image not found' });
     return;
   }
 
   await fs.unlink(outputPath(removed)).catch(() => {});
-
   res.status(204).send();
+});
+
+const BUSY_STATUSES = new Set<ImageStatus>(['downloading', 'scanning', 'patching']);
+
+router.post('/:id/scan', async (req: Request, res: Response) => {
+  const id = parseInt(req.params['id'] as string, 10);
+  if (isNaN(id) || id <= 0) {
+    res.status(400).json({ error: 'id must be a positive integer' });
+    return;
+  }
+
+  const image = await getImageById(id);
+  if (!image) {
+    res.status(404).json({ error: 'Image not found' });
+    return;
+  }
+
+  if (BUSY_STATUSES.has(image.status)) {
+    res.status(409).json({ error: `Image is currently busy (status: ${image.status})` });
+    return;
+  }
+
+  patchImage(image).catch((err) =>
+    logger.warn('Ad-hoc patch failed', { image: `${image.registry}/${image.name}:${image.tag}`, err: String(err) })
+  );
+  res.status(202).json(image);
 });
 
 export default router;

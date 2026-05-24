@@ -63,7 +63,7 @@ export const openApiSpec: OpenAPIV3.Document = {
         },
       },
     },
-    '/images/{name}': {
+    '/images/{id}': {
       delete: {
         tags: ['Images'],
         summary: 'Remove an image from the manifest',
@@ -71,17 +71,52 @@ export const openApiSpec: OpenAPIV3.Document = {
           'Removes the image entry from the manifest and deletes its tar file from the data volume if present.',
         parameters: [
           {
-            name: 'name',
+            name: 'id',
             in: 'path',
             required: true,
-            description: 'Image name (e.g. "nginx" or "library/nginx")',
-            schema: { type: 'string' },
+            description: 'Numeric image ID',
+            schema: { type: 'integer' },
           },
         ],
         responses: {
           '204': { description: 'Image removed successfully' },
+          '400': {
+            description: 'Invalid id',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
           '404': {
             description: 'Image not found',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
+        },
+      },
+    },
+    '/images/{id}/scan': {
+      post: {
+        tags: ['Images'],
+        summary: 'Trigger an ad-hoc scan for a single image',
+        description:
+          'Starts the scan/patch pipeline for one image immediately. Returns 409 if the image is currently busy.',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            description: 'Numeric image ID',
+            schema: { type: 'integer' },
+          },
+        ],
+        responses: {
+          '202': {
+            description: 'Scan started',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ManifestImage' } } },
+          },
+          '404': {
+            description: 'Image not found',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
+          '409': {
+            description: 'Image is currently busy',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
           },
         },
@@ -139,6 +174,7 @@ export const openApiSpec: OpenAPIV3.Document = {
       ManifestImage: {
         type: 'object',
         properties: {
+          id: { type: 'integer', example: 1 },
           name: { type: 'string', example: 'nginx' },
           tag: { type: 'string', example: '1.27' },
           registry: { type: 'string', example: 'docker.io' },
@@ -150,6 +186,7 @@ export const openApiSpec: OpenAPIV3.Document = {
           vulnerabilities: { allOf: [{ $ref: '#/components/schemas/VulnerabilityCounts' }], nullable: true },
         },
         required: [
+          'id',
           'name',
           'tag',
           'registry',

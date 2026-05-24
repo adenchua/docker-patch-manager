@@ -8,6 +8,7 @@ export interface VulnerabilityCounts {
 }
 
 export interface Image {
+  id?: number;
   name: string;
   tag: string;
   registry: string;
