@@ -24,6 +24,11 @@ export async function patchImage(image: ManifestImage): Promise<ManifestImage> {
     await updateImage(set('scanning'));
     const { vulnerabilities, reportPath } = await runTrivy(image);
 
+    // Persist scan results now — Copa may fail but scan data is still valuable
+    const scannedAt = new Date().toISOString();
+    image = { ...image, lastScanned: scannedAt, vulnerabilities };
+    await updateImage(image);
+
     // 3. Patch
     await updateImage(set('patching'));
     const { patchedRef, fullyPatched } = await patchWithCopa(image, reportPath);
@@ -44,9 +49,7 @@ export async function patchImage(image: ManifestImage): Promise<ManifestImage> {
       ...image,
       status: fullyPatched ? 'ready' : 'ready-unpatched',
       tarPath: `images/${path.basename(tarPath)}`,
-      lastScanned: now,
       lastPatched: now,
-      vulnerabilities,
     };
     logger.info('Patch cycle complete', {
       image: `${image.registry}/${image.name}:${image.tag}`,

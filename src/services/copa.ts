@@ -5,6 +5,8 @@ import logger from '../logger.js';
 
 const execFileAsync = promisify(execFile);
 
+const COPA_TIMEOUT = process.env.COPA_TIMEOUT ?? '10m';
+
 export interface CopaResult {
   patchedRef: string;
   fullyPatched: boolean;
@@ -19,7 +21,7 @@ export async function patchWithCopa(image: ManifestImage, trivyReportPath: strin
   const copaStart = Date.now();
 
   try {
-    await execFileAsync('copa', ['patch', '-i', sourceRef, '-r', trivyReportPath, '-t', patchedTag]);
+    await execFileAsync('copa', ['patch', '-i', sourceRef, '-r', trivyReportPath, '-t', patchedTag, '--timeout', COPA_TIMEOUT]);
     logger.info('Copa patch complete', { patchedRef, durationMs: Date.now() - copaStart });
     return { patchedRef, fullyPatched: true };
   } catch (err: unknown) {
@@ -29,6 +31,11 @@ export async function patchWithCopa(image: ManifestImage, trivyReportPath: strin
     if (message.includes('no patchable vulnerabilities') || message.includes('no updates needed')) {
       logger.warn('Copa: no patchable vulnerabilities, image unchanged', { source: sourceRef, reason: message, durationMs: Date.now() - copaStart });
       return { patchedRef: sourceRef, fullyPatched: false };
+    }
+
+    if (message.includes('Operation Timed Out') || message.includes('patch exceeded timeout')) {
+      logger.error('Copa patch timed out', { source: sourceRef, timeout: COPA_TIMEOUT, durationMs: Date.now() - copaStart });
+      throw new Error(`Copa timed out (${COPA_TIMEOUT}) for ${sourceRef}`);
     }
 
     logger.error('Copa patch failed', { source: sourceRef, err: message });

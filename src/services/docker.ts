@@ -28,24 +28,20 @@ export async function runTrivy(image: ManifestImage): Promise<TrivyResult> {
   logger.info('Trivy scan started', { image: ref });
   const trivyStart = Date.now();
 
-  await execFileAsync('docker', [
+  const { stdout } = await execFileAsync('docker', [
     'run',
     '--rm',
     '-v',
     '/var/run/docker.sock:/var/run/docker.sock',
-    '-v',
-    `${os.tmpdir()}:/tmp`,
     'aquasec/trivy',
     'image',
     '--format',
     'json',
-    '--output',
-    `/tmp/${path.basename(reportPath)}`,
     ref,
-  ]);
+  ], { maxBuffer: 50 * 1024 * 1024 });
 
-  const raw = await fs.readFile(reportPath, 'utf-8');
-  const report = JSON.parse(raw);
+  await fs.writeFile(reportPath, stdout, 'utf-8');
+  const report = JSON.parse(stdout);
 
   const counts: VulnerabilityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
   for (const result of report.Results ?? []) {
