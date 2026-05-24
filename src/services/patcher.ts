@@ -7,8 +7,14 @@ import { createLogger } from '../logger.js';
 
 const logger = createLogger('patcher');
 
+const activePatches = new Set<number>();
+
 export async function patchImage(image: Image): Promise<Image> {
-  await ensureOutputDir(image);
+  const id = image.id!;
+  if (activePatches.has(id)) {
+    throw new Error(`Already patching image ${id}`);
+  }
+  activePatches.add(id);
 
   const set = (status: Image['status']): Image => {
     image = { ...image, status };
@@ -16,6 +22,7 @@ export async function patchImage(image: Image): Promise<Image> {
   };
 
   try {
+    await ensureOutputDir(image);
     // 1. Download
     await updateImage(set('downloading'));
     logger.info('Pulling image', { image: `${image.registry}/${image.name}:${image.tag}` });
@@ -76,5 +83,7 @@ export async function patchImage(image: Image): Promise<Image> {
       logger.error('Failed to persist failed status', { err: String(dbErr) })
     );
     throw err;
+  } finally {
+    activePatches.delete(id);
   }
 }
