@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import { getAllImages, getImage, upsertImage, removeImage, outputPath } from '../services/database.js';
 import { patchImage } from '../services/patcher.js';
 import { Image } from '../types/index.js';
+import logger from '../logger.js';
 
 const NAME_RE = /^[a-zA-Z0-9._\-\/]{1,128}$/;
 const TAG_RE = /^[a-zA-Z0-9._\-]{1,128}$/;
@@ -63,7 +64,9 @@ router.post('/', async (req: Request, res: Response) => {
 
   await upsertImage(newImage);
   res.status(201).json(newImage);
-  patchImage(newImage).catch(() => {});
+  patchImage(newImage).catch((err) =>
+    logger.warn('Background patch failed', { image: `${newImage.registry}/${newImage.name}:${newImage.tag}`, err: String(err) })
+  );
 });
 
 router.delete('/:name', async (req: Request, res: Response) => {

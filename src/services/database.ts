@@ -99,6 +99,12 @@ export async function initDatabase(): Promise<void> {
       UNIQUE(name, tag, registry, architecture)
     )
   `);
+
+  // Reset transient states left over from a previous crash or restart so the
+  // scheduler can pick them up again.
+  await run(
+    `UPDATE images SET status = 'pending' WHERE status IN ('downloading', 'scanning', 'patching')`
+  );
 }
 
 export async function getAllImages(): Promise<Image[]> {
