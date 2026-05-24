@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import { Image } from '../types/index.js';
-import { updateImage, outputPath, ensureOutputDir } from './database.js';
+import { updateImage, outputPath, ensureOutputDir, removeImageById } from './database.js';
 import { pullImage, runTrivy, runTrivyOnRef, saveImageAsTar, removeLocalImage } from './docker.js';
 import { patchWithCopa } from './copa.js';
 import { createLogger } from '../logger.js';
@@ -77,6 +77,15 @@ export async function patchImage(image: Image): Promise<Image> {
     await updateImage(image);
     return image;
   } catch (err) {
+    if (String(err).includes('application/vnd.cncf.notary.signature')) {
+      logger.warn('Image resolves to an OCI notary signature, not a container image — removing from database', {
+        image: `${image.registry}/${image.name}:${image.tag}`,
+      });
+      await removeImageById(id).catch((dbErr) =>
+        logger.error('Failed to remove incompatible image', { err: String(dbErr) })
+      );
+      return image;
+    }
     logger.error('Patch cycle failed', { image: `${image.registry}/${image.name}:${image.tag}`, err: String(err) });
     image = { ...image, status: 'failed' };
     await updateImage(image).catch((dbErr) =>
