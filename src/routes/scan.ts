@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { runPatchCycle, getJobStatus } from '../services/scheduler.js';
-import { readManifest } from '../services/manifest.js';
+import { getAllImages } from '../services/database.js';
 
 const router = Router();
 
@@ -10,8 +10,7 @@ router.post('/', async (_req: Request, res: Response) => {
     return;
   }
 
-  const manifest = await readManifest();
-  const images = manifest.images.filter(
+  const images = (await getAllImages()).filter(
     (img) => img.status !== 'downloading' && img.status !== 'scanning' && img.status !== 'patching'
   );
 

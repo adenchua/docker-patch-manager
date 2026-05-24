@@ -3,12 +3,12 @@ services:
     build: .
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./data:/data
+      - ./database:/app/database
+      - ./output:/app/output
     environment:
       PORT: '5432'
       PATCH_SCHEDULE: '0 2 * * *'
       PATCH_CONCURRENCY: '3'
-      DATA_DIR: '/data'
     ports:
       - '${PORT:-5432}:${PORT:-5432}'
     restart: unless-stopped

@@ -7,20 +7,15 @@ export interface VulnerabilityCounts {
   low: number;
 }
 
-export interface ManifestImage {
+export interface Image {
   name: string;
   tag: string;
   registry: string;
   architecture: string;
   status: ImageStatus;
-  tarPath: string | null;
   lastScanned: string | null;
   lastPatched: string | null;
   vulnerabilities: VulnerabilityCounts | null;
-}
-
-export interface ManifestFile {
-  images: ManifestImage[];
 }
 
 export interface JobStatus {

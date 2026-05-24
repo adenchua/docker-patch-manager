@@ -6,12 +6,12 @@ import { createWriteStream } from 'fs';
 import path from 'path';
 import os from 'os';
 import fs from 'fs/promises';
-import { ManifestImage, VulnerabilityCounts } from '../types/index.js';
+import { Image, VulnerabilityCounts } from '../types/index.js';
 import logger from '../logger.js';
 
 const execFileAsync = promisify(execFile);
 
-export async function pullImage(image: ManifestImage): Promise<void> {
+export async function pullImage(image: Image): Promise<void> {
   const ref = `${image.registry}/${image.name}:${image.tag}`;
   await execFileAsync('docker', ['pull', '--platform', image.architecture, ref]);
 }
@@ -21,7 +21,7 @@ export interface TrivyResult {
   reportPath: string;
 }
 
-export async function runTrivy(image: ManifestImage): Promise<TrivyResult> {
+export async function runTrivy(image: Image): Promise<TrivyResult> {
   const ref = `${image.registry}/${image.name}:${image.tag}`;
   const reportPath = path.join(os.tmpdir(), `trivy-${image.name.replace(/\//g, '_')}-${image.tag}.json`);
 

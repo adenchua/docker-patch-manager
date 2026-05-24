@@ -1,15 +1,14 @@
 import fs from 'fs/promises';
-import path from 'path';
-import { ManifestImage } from '../types/index.js';
-import { updateImage, tarFilename, ensureImagesDir } from './manifest.js';
+import { Image } from '../types/index.js';
+import { updateImage, outputPath, ensureOutputDir } from './database.js';
 import { pullImage, runTrivy, runTrivyOnRef, saveImageAsTar, removeLocalImage } from './docker.js';
 import { patchWithCopa } from './copa.js';
 import logger from '../logger.js';
 
-export async function patchImage(image: ManifestImage): Promise<ManifestImage> {
-  await ensureImagesDir();
+export async function patchImage(image: Image): Promise<Image> {
+  await ensureOutputDir(image);
 
-  const set = (status: ManifestImage['status']): ManifestImage => {
+  const set = (status: Image['status']): Image => {
     image = { ...image, status };
     return image;
   };
@@ -45,7 +44,7 @@ export async function patchImage(image: ManifestImage): Promise<ManifestImage> {
     }
 
     // 4. Save tar
-    const tarPath = tarFilename(image);
+    const tarPath = outputPath(image);
     await saveImageAsTar(patchedRef, tarPath);
 
     // 5. Cleanup tmp report and local images
@@ -59,14 +58,12 @@ export async function patchImage(image: ManifestImage): Promise<ManifestImage> {
     image = {
       ...image,
       status: fullyPatched ? 'ready' : 'ready-unpatched',
-      tarPath: `images/${path.basename(tarPath)}`,
       lastPatched: now,
     };
     logger.info('Patch cycle complete', {
       image: `${image.registry}/${image.name}:${image.tag}`,
       status: image.status,
       vulnerabilities: image.vulnerabilities,
-      tarPath: image.tarPath,
     });
     await updateImage(image);
     return image;

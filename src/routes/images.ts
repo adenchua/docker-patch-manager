@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs/promises';
-import { readManifest, writeManifest, removeImage, tarFilename } from '../services/manifest.js';
+import { getAllImages, getImage, upsertImage, removeImage, outputPath } from '../services/database.js';
 import { patchImage } from '../services/patcher.js';
-import { ManifestImage } from '../types/index.js';
+import { Image } from '../types/index.js';
 
 const NAME_RE = /^[a-zA-Z0-9._\-\/]{1,128}$/;
 const TAG_RE = /^[a-zA-Z0-9._\-]{1,128}$/;
@@ -15,12 +15,12 @@ const ARCH_ALLOWLIST = new Set([
 const router = Router();
 
 router.get('/', async (_req: Request, res: Response) => {
-  const manifest = await readManifest();
-  res.json(manifest.images);
+  const images = await getAllImages();
+  res.json(images);
 });
 
 router.post('/', async (req: Request, res: Response) => {
-  const { name, tag, registry, architecture } = req.body as Partial<ManifestImage>;
+  const { name, tag, registry, architecture } = req.body as Partial<Image>;
 
   if (!name || !tag || !registry || !architecture) {
     res.status(400).json({ error: 'name, tag, registry, and architecture are required' });
@@ -44,44 +44,45 @@ router.post('/', async (req: Request, res: Response) => {
     return;
   }
 
-  const manifest = await readManifest();
-  const existing = manifest.images.find((img) => img.name === name && img.tag === tag && img.registry === registry);
+  const existing = await getImage(name, tag, registry, architecture);
   if (existing) {
-    res.status(409).json({ error: 'Image already exists in manifest' });
+    res.status(409).json({ error: 'Image already exists' });
     return;
   }
 
-  const newImage: ManifestImage = {
+  const newImage: Image = {
     name,
     tag,
     registry,
     architecture,
     status: 'pending',
-    tarPath: null,
     lastScanned: null,
     lastPatched: null,
     vulnerabilities: null,
   };
 
-  manifest.images.push(newImage);
-  await writeManifest(manifest);
+  await upsertImage(newImage);
   res.status(201).json(newImage);
   patchImage(newImage).catch(() => {});
 });
 
 router.delete('/:name', async (req: Request, res: Response) => {
   const name = req.params['name'] as string;
-  const removed = await removeImage(name);
+  const { tag, registry, architecture } = req.query as Record<string, string | undefined>;
+
+  if (!tag || !registry || !architecture) {
+    res.status(400).json({ error: 'tag, registry, and architecture query params are required' });
+    return;
+  }
+
+  const removed = await removeImage(name, tag, registry, architecture);
 
   if (!removed) {
     res.status(404).json({ error: 'Image not found' });
     return;
   }
 
-  if (removed.tarPath) {
-    const fullTarPath = tarFilename(removed);
-    await fs.unlink(fullTarPath).catch(() => {});
-  }
+  await fs.unlink(outputPath(removed)).catch(() => {});
 
   res.status(204).send();
 });

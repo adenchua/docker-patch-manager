@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import pLimit from 'p-limit';
-import { readManifest } from './manifest.js';
+import { getAllImages } from './database.js';
 import { patchImage } from './patcher.js';
 import { JobStatus, LastRunSummary } from '../types/index.js';
 import logger from '../logger.js';
@@ -23,8 +23,8 @@ export async function runPatchCycle(): Promise<boolean> {
   const summary = { patched: 0, unpatchable: 0, failed: 0, total: 0 };
 
   try {
-    const manifest = await readManifest();
-    const images = manifest.images.filter(
+    const allImages = await getAllImages();
+    const images = allImages.filter(
       (img) => img.status !== 'downloading' && img.status !== 'scanning' && img.status !== 'patching'
     );
     summary.total = images.length;

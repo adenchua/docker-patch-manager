@@ -1,6 +1,6 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { ManifestImage } from '../types/index.js';
+import { Image } from '../types/index.js';
 import logger from '../logger.js';
 
 const execFileAsync = promisify(execFile);
@@ -12,7 +12,7 @@ export interface CopaResult {
   fullyPatched: boolean;
 }
 
-export async function patchWithCopa(image: ManifestImage, trivyReportPath: string): Promise<CopaResult> {
+export async function patchWithCopa(image: Image, trivyReportPath: string): Promise<CopaResult> {
   const sourceRef = `${image.registry}/${image.name}:${image.tag}`;
   const patchedTag = image.tag;
   const patchedRef = `${image.registry}/${image.name}:${patchedTag}`;

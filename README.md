@@ -17,7 +17,7 @@ Trivy scan → vulnerability report
 Copa patch → updated image layers (OS packages only)
       │
       ▼
-docker save | gzip → /data/images/<name>_<tag>.tgz
+docker save | gzip → /output/<arch>/<name>_<tag>.tgz
       │
       ▼
 Transfer tar to offline environment → docker load
@@ -38,7 +38,7 @@ docker compose up --build
 
 The API is available at `http://localhost:5432`. Interactive API docs at `http://localhost:5432/docs`.
 
-Patched image tars and the manifest are written to `./data/` on the host.
+Patched image tars are written to `./output/` on the host, organized by architecture. The database is stored in `./database/`.
 
 ## Configuration
 
@@ -47,7 +47,7 @@ Patched image tars and the manifest are written to `./data/` on the host.
 | `PORT`              | `5432`      | HTTP server port                                          |
 | `PATCH_SCHEDULE`    | `0 2 * * *` | Cron expression for automatic patch cycles (daily at 2am) |
 | `PATCH_CONCURRENCY` | `3`         | Max images processed simultaneously                       |
-| `DATA_DIR`          | `/data`     | Mount path for manifest and image tars                    |
+| `COPA_TIMEOUT`      | `10m`       | Timeout for each Copa patch operation                     |
 
 Copy `.env.example` to `.env` and adjust values before running outside Docker Compose.
 
@@ -57,7 +57,7 @@ Copy `.env.example` to `.env` and adjust values before running outside Docker Co
 | -------- | --------------- | ------------------------------------------------- |
 | `GET`    | `/images`       | List all images in the manifest                   |
 | `POST`   | `/images`       | Add an image to the manifest                      |
-| `DELETE` | `/images/:name` | Remove an image and delete its tar                |
+| `DELETE` | `/images/:name?tag=&registry=&architecture=` | Remove an image and delete its tar |
 | `POST`   | `/scan`         | Trigger an immediate scan-and-patch cycle         |
 | `GET`    | `/scan/status`  | Current job state, progress, and last run summary |
 | `GET`    | `/health`       | Health check                                      |
@@ -83,17 +83,21 @@ curl -X POST http://localhost:5432/scan
 curl http://localhost:5432/scan/status
 ```
 
-## Data Volume
+## Data Layout
 
 ```
-./data/
-├── manifest.json       # Image list with status, vuln counts, and tar paths
-└── images/
-    ├── nginx_1.27.tgz
-    └── redis_7.2.tgz
+./database/
+└── patch-manager.db        # SQLite database (image list, status, vuln counts)
+
+./output/
+├── linux-amd64/
+│   ├── nginx_1.27.tgz
+│   └── redis_7.2.tgz
+└── linux-arm64/
+    └── nginx_1.27.tgz
 ```
 
-Transfer the `images/` directory and `manifest.json` to your offline environment. Load images with:
+Both directories are bind-mounted into the container and persist across restarts. Transfer the relevant architecture folder to your offline environment and load images with:
 
 ```bash
 docker load -i nginx_1.27.tgz

@@ -6,6 +6,7 @@ import swaggerUi from 'swagger-ui-express';
 import imagesRouter from './routes/images.js';
 import scanRouter from './routes/scan.js';
 import { startScheduler } from './services/scheduler.js';
+import { initDatabase } from './services/database.js';
 import { openApiSpec } from './openapi.js';
 import logger from './logger.js';
 
@@ -74,7 +75,14 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-app.listen(port, () => {
-  logger.info('Server running', { port });
-  startScheduler();
-});
+initDatabase()
+  .then(() => {
+    app.listen(port, () => {
+      logger.info('Server running', { port });
+      startScheduler();
+    });
+  })
+  .catch((err) => {
+    logger.error('Failed to initialize database', { err: String(err) });
+    process.exit(1);
+  });
