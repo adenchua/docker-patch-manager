@@ -14,7 +14,7 @@ export interface CopaResult {
 
 export async function patchWithCopa(image: ManifestImage, trivyReportPath: string): Promise<CopaResult> {
   const sourceRef = `${image.registry}/${image.name}:${image.tag}`;
-  const patchedTag = `${image.tag}-patched`;
+  const patchedTag = image.tag;
   const patchedRef = `${image.registry}/${image.name}:${patchedTag}`;
 
   logger.info('Copa patch started', { source: sourceRef, target: patchedRef });

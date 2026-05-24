@@ -45,7 +45,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 
   const manifest = await readManifest();
-  const existing = manifest.images.find((img) => img.name === name && img.registry === registry);
+  const existing = manifest.images.find((img) => img.name === name && img.tag === tag && img.registry === registry);
   if (existing) {
     res.status(409).json({ error: 'Image already exists in manifest' });
     return;
