@@ -98,15 +98,9 @@ export async function saveImageAsTar(imageRef: string, destPath: string): Promis
   const stderrChunks: Buffer[] = [];
   dockerSave.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
 
-  try {
-    await pipeline(dockerSave.stdout, gzip, out);
-  } catch (err) {
-    await fs.unlink(destPath).catch(() => {});
-    const stderrText = Buffer.concat(stderrChunks).toString().trim();
-    throw new Error(`docker save failed for "${imageRef}": ${stderrText || String(err)}`);
-  }
-
-  await new Promise<void>((resolve, reject) => {
+  // Register before pipeline: ChildProcess emits 'close' via process.nextTick, which runs
+  // before Promise microtasks, so registering after `await pipeline` would miss the event.
+  const closePromise = new Promise<void>((resolve, reject) => {
     dockerSave.on('close', (code) => {
       if (code === 0) {
         resolve();
@@ -118,6 +112,18 @@ export async function saveImageAsTar(imageRef: string, destPath: string): Promis
     });
     dockerSave.on('error', reject);
   });
+
+  try {
+    await pipeline(dockerSave.stdout, gzip, out);
+  } catch (err) {
+    closePromise.catch(() => {});
+    dockerSave.kill();
+    await fs.unlink(destPath).catch(() => {});
+    const stderrText = Buffer.concat(stderrChunks).toString().trim();
+    throw new Error(`docker save failed for "${imageRef}": ${stderrText || String(err)}`);
+  }
+
+  await closePromise;
 }
 
 export async function removeLocalImage(imageRef: string): Promise<void> {
