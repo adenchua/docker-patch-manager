@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs/promises';
 import { readManifest, writeManifest, removeImage, tarFilename } from '../services/manifest.js';
+import { patchImage } from '../services/patcher.js';
 import { ManifestImage } from '../types/index.js';
 
 const NAME_RE = /^[a-zA-Z0-9._\-\/]{1,128}$/;
@@ -65,6 +66,7 @@ router.post('/', async (req: Request, res: Response) => {
   manifest.images.push(newImage);
   await writeManifest(manifest);
   res.status(201).json(newImage);
+  patchImage(newImage).catch(() => {});
 });
 
 router.delete('/:name', async (req: Request, res: Response) => {
