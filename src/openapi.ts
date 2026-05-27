@@ -186,7 +186,17 @@ export const openApiSpec: OpenAPIV3.Document = {
         type: 'string',
         enum: ['pending', 'downloading', 'scanning', 'patching', 'ready', 'ready-unpatched', 'failed'],
         description:
-          '`pending` – added, not yet processed. `ready` – fully patched. `ready-unpatched` – scanned but only language-level vulns remain (Copa cannot patch). `failed` – pipeline error.',
+          '`pending` – added, not yet processed. `ready` – fully patched. `ready-unpatched` – Copa was not run or found nothing to patch; see `patchReason` for details. `failed` – pipeline error.',
+      },
+      PatchReason: {
+        type: 'string',
+        nullable: true,
+        enum: ['app-layer-only', 'no-os-vulns', 'copa-no-updates', null],
+        description:
+          '`app-layer-only` – no OS package manager (dpkg/rpm/apk) found in Trivy report; image is distroless/scratch and Copa cannot help. ' +
+          '`no-os-vulns` – OS packages present but no OS-level CVEs; Copa skipped as an optimisation. ' +
+          '`copa-no-updates` – Copa ran but confirmed no upstream OS updates are available. ' +
+          'null when the image is fully patched (status `ready`) or not yet processed.',
       },
       VulnerabilityCounts: {
         type: 'object',
@@ -211,6 +221,7 @@ export const openApiSpec: OpenAPIV3.Document = {
           lastScanned: { type: 'string', format: 'date-time', nullable: true },
           lastPatched: { type: 'string', format: 'date-time', nullable: true },
           vulnerabilities: { allOf: [{ $ref: '#/components/schemas/VulnerabilityCounts' }], nullable: true },
+          patchReason: { allOf: [{ $ref: '#/components/schemas/PatchReason' }], nullable: true },
         },
         required: [
           'id',
@@ -223,6 +234,7 @@ export const openApiSpec: OpenAPIV3.Document = {
           'lastScanned',
           'lastPatched',
           'vulnerabilities',
+          'patchReason',
         ],
       },
       AddImageRequest: {

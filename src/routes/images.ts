@@ -63,6 +63,7 @@ router.post('/', async (req: Request, res: Response) => {
     lastScanned: null,
     lastPatched: null,
     vulnerabilities: null,
+    patchReason: null,
   };
 
   await upsertImage(newImage);

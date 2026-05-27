@@ -30,16 +30,42 @@ export async function patchImage(image: Image): Promise<Image> {
 
     // 2. Scan
     await updateImage(set('scanning'));
-    const { vulnerabilities, reportPath } = await runTrivy(image);
+    const { vulnerabilities, reportPath, hasOsPackageTypes, hasOsVulns } = await runTrivy(image);
 
     // Persist scan results now — Copa may fail but scan data is still valuable
     const scannedAt = new Date().toISOString();
     image = { ...image, lastScanned: scannedAt, vulnerabilities };
     await updateImage(image);
 
-    // 3. Patch
-    await updateImage(set('patching'));
-    const { patchedRef, fullyPatched } = await patchWithCopa(image, reportPath);
+    // 3. Gate: decide whether to invoke Copa based on Trivy patchability data
+    let patchedRef: string;
+    let fullyPatched: boolean;
+    let patchReason: Image['patchReason'] = null;
+
+    if (!hasOsPackageTypes) {
+      // No dpkg/rpm/apk result types — image is app-layer-only (distroless/scratch); Copa cannot help
+      patchedRef = `${image.registry}/${image.name}:${image.tag}`;
+      fullyPatched = false;
+      patchReason = 'app-layer-only';
+      logger.info('Skipping Copa: no OS package types in Trivy report (distroless/scratch/app-layer-only)', {
+        image: `${image.registry}/${image.name}:${image.tag}`,
+      });
+    } else if (!hasOsVulns) {
+      // OS package DB present but no OS-level CVEs — Copa would find nothing to patch
+      patchedRef = `${image.registry}/${image.name}:${image.tag}`;
+      fullyPatched = false;
+      patchReason = 'no-os-vulns';
+      logger.info('Skipping Copa: OS packages present but no OS-level vulnerabilities', {
+        image: `${image.registry}/${image.name}:${image.tag}`,
+      });
+    } else {
+      // OS-level CVEs found — invoke Copa (handles both regular and distroless DPKG/RPM images)
+      await updateImage(set('patching'));
+      const copaResult = await patchWithCopa(image, reportPath);
+      patchedRef = copaResult.patchedRef;
+      fullyPatched = copaResult.fullyPatched;
+      if (!fullyPatched) patchReason = 'copa-no-updates';
+    }
 
     // 3b. Re-scan patched image to reflect updated vulnerability counts
     if (fullyPatched) {
@@ -68,6 +94,7 @@ export async function patchImage(image: Image): Promise<Image> {
       ...image,
       status: fullyPatched ? 'ready' : 'ready-unpatched',
       lastPatched: now,
+      patchReason,
     };
     logger.info('Patch cycle complete', {
       image: `${image.registry}/${image.name}:${image.tag}`,

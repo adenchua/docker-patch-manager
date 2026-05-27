@@ -13,6 +13,7 @@ const logger = createLogger('docker');
 
 const execFileAsync = promisify(execFile);
 
+const OS_PACKAGE_TYPES = new Set(['dpkg', 'rpm', 'apk']);
 
 export async function pullImage(image: Image): Promise<void> {
   const ref = `${image.registry}/${image.name}:${image.tag}`;
@@ -22,6 +23,8 @@ export async function pullImage(image: Image): Promise<void> {
 export interface TrivyResult {
   vulnerabilities: VulnerabilityCounts;
   reportPath: string;
+  hasOsPackageTypes: boolean; // true if any Result.Type is in {dpkg, rpm, apk}
+  hasOsVulns: boolean;        // true if any such OS-type result has ≥1 vulnerability
 }
 
 export async function runTrivy(image: Image): Promise<TrivyResult> {
@@ -47,19 +50,27 @@ export async function runTrivy(image: Image): Promise<TrivyResult> {
   const report = JSON.parse(stdout);
 
   const counts: VulnerabilityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+  let hasOsPackageTypes = false;
+  let hasOsVulns = false;
+
   for (const result of report.Results ?? []) {
+    const isOsType = OS_PACKAGE_TYPES.has(result.Type as string);
+    if (isOsType) hasOsPackageTypes = true;
+
     for (const vuln of result.Vulnerabilities ?? []) {
       const sev = (vuln.Severity as string).toLowerCase();
       if (sev === 'critical') counts.critical++;
       else if (sev === 'high') counts.high++;
       else if (sev === 'medium') counts.medium++;
       else if (sev === 'low') counts.low++;
+
+      if (isOsType) hasOsVulns = true;
     }
   }
 
-  logger.info('Trivy scan complete', { image: ref, vulnerabilities: counts, durationMs: Date.now() - trivyStart });
+  logger.info('Trivy scan complete', { image: ref, vulnerabilities: counts, hasOsPackageTypes, hasOsVulns, durationMs: Date.now() - trivyStart });
 
-  return { vulnerabilities: counts, reportPath };
+  return { vulnerabilities: counts, reportPath, hasOsPackageTypes, hasOsVulns };
 }
 
 export async function runTrivyOnRef(imageRef: string): Promise<VulnerabilityCounts> {

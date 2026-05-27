@@ -1,7 +1,10 @@
 import sqlite3 from 'sqlite3';
 import fs from 'fs/promises';
 import path from 'path';
-import { Image, ImageStatus, VulnerabilityCounts } from '../types/index.js';
+import { Image, ImageStatus, VulnerabilityCounts, PatchReason } from '../types/index.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('database');
 
 const DATABASE_DIR = path.resolve('database');
 const DATABASE_PATH = path.join(DATABASE_DIR, 'patch-manager.db');
@@ -49,6 +52,7 @@ interface ImageRow {
   vulnerabilities_high: number | null;
   vulnerabilities_medium: number | null;
   vulnerabilities_low: number | null;
+  patch_reason: string | null;
 }
 
 function rowToImage(row: ImageRow): Image {
@@ -77,6 +81,7 @@ function rowToImage(row: ImageRow): Image {
     lastScanned: row.last_scanned,
     lastPatched: row.last_patched,
     vulnerabilities,
+    patchReason: (row.patch_reason as PatchReason | null) ?? null,
   };
 }
 
@@ -98,9 +103,16 @@ export async function initDatabase(): Promise<void> {
       vulnerabilities_high     INTEGER,
       vulnerabilities_medium   INTEGER,
       vulnerabilities_low      INTEGER,
+      patch_reason             TEXT,
       UNIQUE(name, tag, registry, architecture)
     )
   `);
+
+  // Migrate existing databases: add patch_reason column if it doesn't exist yet.
+  // SQLite does not support ALTER TABLE IF NOT EXISTS, so we catch the duplicate-column error.
+  await run(`ALTER TABLE images ADD COLUMN patch_reason TEXT`).catch((err) => {
+    logger.debug('ALTER TABLE patch_reason skipped (column already exists)', { err: String(err) });
+  });
 
   // Reset transient states left over from a previous crash or restart so the
   // scheduler can pick them up again.
@@ -143,8 +155,9 @@ export async function upsertImage(image: Image): Promise<void> {
   await run(
     `INSERT OR REPLACE INTO images
       (name, tag, registry, architecture, status, last_scanned, last_patched,
-       vulnerabilities_critical, vulnerabilities_high, vulnerabilities_medium, vulnerabilities_low)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       vulnerabilities_critical, vulnerabilities_high, vulnerabilities_medium,
+       vulnerabilities_low, patch_reason)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       image.name,
       image.tag,
@@ -157,6 +170,7 @@ export async function upsertImage(image: Image): Promise<void> {
       image.vulnerabilities?.high ?? null,
       image.vulnerabilities?.medium ?? null,
       image.vulnerabilities?.low ?? null,
+      image.patchReason ?? null,
     ]
   );
 }
@@ -170,7 +184,8 @@ export async function updateImage(image: Image): Promise<void> {
       vulnerabilities_critical = ?,
       vulnerabilities_high = ?,
       vulnerabilities_medium = ?,
-      vulnerabilities_low = ?
+      vulnerabilities_low = ?,
+      patch_reason = ?
      WHERE name = ? AND tag = ? AND registry = ? AND architecture = ?`,
     [
       image.status,
@@ -180,6 +195,7 @@ export async function updateImage(image: Image): Promise<void> {
       image.vulnerabilities?.high ?? null,
       image.vulnerabilities?.medium ?? null,
       image.vulnerabilities?.low ?? null,
+      image.patchReason ?? null,
       image.name,
       image.tag,
       image.registry,

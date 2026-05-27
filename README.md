@@ -14,7 +14,16 @@ docker pull (from Docker Hub or other registry)
 Trivy scan → vulnerability report
       │
       ▼
+OS package types found?  ──No──▶ skip Copa → ready-unpatched (patchReason: app-layer-only)
+      │ Yes
+      ▼
+OS-level CVEs present?   ──No──▶ skip Copa → ready-unpatched (patchReason: no-os-vulns)
+      │ Yes
+      ▼
 Copa patch → updated image layers (OS packages only)
+      │
+      ├── updates applied ──▶ ready
+      └── no updates found ──▶ ready-unpatched (patchReason: copa-no-updates)
       │
       ▼
 docker save | gzip → /output/<arch>/<name>_<tag>.tgz
@@ -23,7 +32,21 @@ docker save | gzip → /output/<arch>/<name>_<tag>.tgz
 Transfer tar to offline environment → docker load
 ```
 
-Images that only contain language-level vulnerabilities (npm, pip, etc.) that Copa cannot patch are saved as-is and marked `ready-unpatched` with the vulnerability counts preserved for the operator's awareness.
+Copa only runs when Trivy's report contains OS-level package types (`dpkg`, `rpm`, or `apk`) **and** at least one CVE in those packages. This avoids unnecessary BuildKit round-trips and gives operators a clear `patchReason` field explaining exactly why an image was not patched.
+
+## Distroless Images
+
+Copa can still patch many distroless images — it spins up an external build-tooling container rather than relying on a package manager inside the target image. The key factor is whether the image retains OS package metadata:
+
+| Image type | Trivy sees | Copa behaviour | `patchReason` |
+| ---------- | ---------- | -------------- | ------------- |
+| Regular Debian / Alpine / RHEL | `dpkg` / `apk` / `rpm` results with CVEs | Patches OS packages | `null` (fully patched) |
+| Distroless **Debian-based** (e.g. `gcr.io/distroless/base-debian12`) | `dpkg` results, may have CVEs | Copa patches via external tooling | `null` or `copa-no-updates` |
+| Distroless **RPM-based** | `rpm` results, may have CVEs | Copa patches via external tooling | `null` or `copa-no-updates` |
+| True distroless / scratch (no OS package DB) | Only app-layer results (`gomodule`, `npm`, etc.) | Copa skipped entirely | `app-layer-only` |
+| Any image with clean OS packages | OS package types present, zero OS CVEs | Copa skipped as optimisation | `no-os-vulns` |
+
+Images with `ready-unpatched` status are saved to the output directory unchanged — vulnerability counts are preserved for the operator's awareness.
 
 ## Requirements
 
