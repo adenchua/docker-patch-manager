@@ -3,7 +3,7 @@ services:
     image: moby/buildkit:latest
     privileged: true
     restart: unless-stopped
-    command: --addr tcp://0.0.0.0:1234
+    command: --addr tcp://0.0.0.0:1234 --oci-worker-snapshotter=native
 
   patch-manager:
     build:

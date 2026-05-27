@@ -23,7 +23,7 @@ export async function patchWithCopa(image: Image, trivyReportPath: string): Prom
   logger.info('Copa patch started', { source: sourceRef, target: patchedRef });
   const copaStart = Date.now();
 
-  const copaArgs = ['patch', '-i', sourceRef, '-r', trivyReportPath, '-t', patchedTag, '--timeout', COPA_TIMEOUT];
+  const copaArgs = ['patch', '-i', sourceRef, '-r', trivyReportPath, '-t', patchedTag, '--timeout', COPA_TIMEOUT, '--platform', image.architecture];
   if (COPA_BUILDKIT_ADDR) copaArgs.push('--addr', COPA_BUILDKIT_ADDR);
 
   try {
