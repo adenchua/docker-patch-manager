@@ -13,8 +13,6 @@ const logger = createLogger('docker');
 
 const execFileAsync = promisify(execFile);
 
-const OS_PACKAGE_TYPES = new Set(['dpkg', 'rpm', 'apk']);
-
 export async function pullImage(image: Image): Promise<void> {
   const ref = `${image.registry}/${image.name}:${image.tag}`;
   await execFileAsync('docker', ['pull', '--platform', image.architecture, ref]);
@@ -23,8 +21,8 @@ export async function pullImage(image: Image): Promise<void> {
 export interface TrivyResult {
   vulnerabilities: VulnerabilityCounts;
   reportPath: string;
-  hasOsPackageTypes: boolean; // true if any Result.Type is in {dpkg, rpm, apk}
-  hasOsVulns: boolean;        // true if any such OS-type result has ≥1 vulnerability
+  hasOsPackageTypes: boolean; // true if any result has Class === 'os-pkgs'
+  hasOsVulns: boolean;        // true if any os-pkgs result has ≥1 vulnerability
 }
 
 export async function runTrivy(image: Image): Promise<TrivyResult> {
@@ -55,7 +53,7 @@ export async function runTrivy(image: Image): Promise<TrivyResult> {
   let hasOsVulns = false;
 
   for (const result of report.Results ?? []) {
-    const isOsType = OS_PACKAGE_TYPES.has(result.Type as string);
+    const isOsType = result.Class === 'os-pkgs';
     if (isOsType) hasOsPackageTypes = true;
 
     for (const vuln of result.Vulnerabilities ?? []) {
