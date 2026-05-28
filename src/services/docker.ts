@@ -43,6 +43,7 @@ export async function runTrivy(image: Image): Promise<TrivyResult> {
     'image',
     '--format',
     'json',
+    '--list-all-pkgs',
     ref,
   ], { maxBuffer: 50 * 1024 * 1024 });
 
