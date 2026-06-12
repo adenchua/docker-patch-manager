@@ -60,7 +60,10 @@ app.use('/scan', scanRouter);
 // 6. Global error handler — must be last, must have 4 params
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  logger.error('Unhandled request error', { err: String(err) });
+  logger.error('Unhandled request error', {
+    err: err instanceof Error ? err.message : String(err),
+    ...(err instanceof Error && err.stack ? { stack: err.stack } : {}),
+  });
   const status =
     err instanceof Error && 'status' in err && typeof (err as { status: unknown }).status === 'number'
       ? (err as { status: number }).status

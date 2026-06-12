@@ -8,7 +8,27 @@ const logger = createLogger('copa');
 const execFileAsync = promisify(execFile);
 
 const COPA_TIMEOUT = process.env.COPA_TIMEOUT ?? '10m';
-const COPA_BUILDKIT_ADDR = process.env.COPA_BUILDKIT_ADDR;
+
+// Schemes accepted by buildkit client connhelpers plus copa's buildx helper.
+// `\S*` (not `\S+`): `buildx://` with no builder name is valid (current builder).
+const BUILDKIT_ADDR_RE =
+  /^(tcp|unix|docker-container|kube-pod|podman-container|nerdctl-container|ssh|buildx):\/\/\S*$/;
+
+// Validated at module load so a bad value aborts startup instead of failing on the first patch.
+function resolveBuildkitAddr(): string | undefined {
+  const raw = process.env.COPA_BUILDKIT_ADDR;
+  if (raw === undefined || raw.trim() === '') return undefined;
+  const addr = raw.trim();
+  if (!BUILDKIT_ADDR_RE.test(addr)) {
+    throw new Error(
+      `Invalid COPA_BUILDKIT_ADDR "${raw}": expected <scheme>://<address> with scheme one of ` +
+        'tcp, unix, docker-container, kube-pod, podman-container, nerdctl-container, ssh, buildx'
+    );
+  }
+  return addr;
+}
+
+const COPA_BUILDKIT_ADDR = resolveBuildkitAddr();
 
 export interface CopaResult {
   patchedRef: string;

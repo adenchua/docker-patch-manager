@@ -10,7 +10,17 @@ const logger = createLogger('images');
 
 const NAME_RE = /^[a-zA-Z0-9._\-\/]{1,128}$/;
 const TAG_RE = /^[a-zA-Z0-9._\-]{1,128}$/;
-const REGISTRY_RE = /^[a-zA-Z0-9.\-]+(:\d{1,5})?$/;
+const REGISTRY_RE = /^[a-zA-Z0-9.\-]+(?::(\d{1,5}))?$/;
+
+function isValidRegistry(registry: string): boolean {
+  const m = REGISTRY_RE.exec(registry);
+  if (!m) return false;
+  if (m[1] !== undefined) {
+    const port = Number(m[1]);
+    if (port < 1 || port > 65535) return false;
+  }
+  return true;
+}
 const ARCH_ALLOWLIST = new Set([
   'linux/amd64', 'linux/arm64', 'linux/arm/v7',
   'linux/arm/v6', 'linux/386', 'linux/ppc64le', 'linux/s390x',
@@ -39,7 +49,7 @@ router.post('/', async (req: Request, res: Response) => {
     res.status(400).json({ error: 'tag contains invalid characters' });
     return;
   }
-  if (!REGISTRY_RE.test(registry)) {
+  if (!isValidRegistry(registry)) {
     res.status(400).json({ error: 'registry format is invalid' });
     return;
   }

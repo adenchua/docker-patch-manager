@@ -65,19 +65,34 @@ The `docker-compose.yml` includes a dedicated `buildkitd` sidecar that Copa uses
 
 On a native Linux host the sidecar is unnecessary — remove the `buildkitd` service and the `COPA_BUILDKIT_ADDR` environment variable and Copa will use the Docker daemon's built-in BuildKit directly.
 
+**Windows hosts** are supported only via `docker compose` on Docker Desktop with the WSL2 backend. Running natively with `npm run dev` on Windows is unsupported — the service assumes a Unix Docker socket (`/var/run/docker.sock`) and Linux `docker`/`copa` CLI behaviour.
+
+**Windows container images** cannot be patched: Copa only patches Linux OS packages (`dpkg`/`rpm`/`apk`), which is why the API's architecture allowlist accepts `linux/*` platforms only. Linux images can of course be managed *from* a Windows host via Docker Desktop.
+
 The API is available at `http://localhost:5432`. Interactive API docs at `http://localhost:5432/docs`.
 
 Patched image tars are written to `./output/` on the host, organized by architecture. The database is stored in `./database/`.
 
+## Security & Deployment
+
+- **No built-in authentication.** Anyone who can reach the port can add images and trigger scans. Run the service on a trusted internal network only, or place it behind a reverse proxy (nginx, Traefik, Caddy) that terminates TLS and enforces authentication.
+- **The container is root-equivalent on the host.** It mounts the host Docker socket (`/var/run/docker.sock`), which grants full control of the Docker daemon. Never expose this service to the public internet.
+- The `patch-manager` container itself runs unprivileged — only the `buildkitd` sidecar needs `privileged: true`.
+- The Trivy scanner image and BuildKit sidecar are version-pinned (`TRIVY_IMAGE`, `BUILDKIT_VERSION`) for supply-chain reproducibility. Pinning freezes the scanner *binary* only — the CVE database is still downloaded fresh at scan time (and cached in the `trivy-db-cache` volume). Bump the pins periodically.
+
 ## Configuration
 
-| Variable            | Default     | Description                                               |
-| ------------------- | ----------- | --------------------------------------------------------- |
-| `PORT`              | `5432`      | HTTP server port                                          |
-| `PATCH_SCHEDULE`    | `0 2 * * *` | Cron expression for automatic patch cycles (daily at 2am) |
-| `PATCH_CONCURRENCY` | `3`         | Max images processed simultaneously                       |
-| `COPA_TIMEOUT`      | `30m`       | Timeout for each Copa patch operation                     |
-| `CORS_ORIGIN`       | `http://localhost:5432` | Allowed CORS origin for API requests             |
+| Variable             | Default                 | Description                                                                                      |
+| -------------------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
+| `PORT`               | `5432`                  | HTTP server port                                                                                 |
+| `PATCH_SCHEDULE`     | `0 2 * * *`             | Cron expression for automatic patch cycles (daily at 2am)                                        |
+| `PATCH_CONCURRENCY`  | `3`                     | Max images processed simultaneously                                                              |
+| `COPA_TIMEOUT`       | `10m`                   | Timeout for each Copa patch operation                                                            |
+| `COPA_BUILDKIT_ADDR` | _(unset)_               | BuildKit address for Copa (`<scheme>://<address>`; schemes: `tcp`, `unix`, `docker-container`, `kube-pod`, `podman-container`, `nerdctl-container`, `ssh`, `buildx`). Unset → Copa's default resolution |
+| `TRIVY_IMAGE`        | `aquasec/trivy:0.71.0`  | Pinned Trivy scanner image (binary only — the CVE DB still updates at scan time)                 |
+| `TRIVY_CACHE_VOLUME` | `trivy-db-cache`        | Docker named volume caching the Trivy vulnerability DB between scans                             |
+| `BUILDKIT_VERSION`   | `v0.30.0`               | BuildKit sidecar image tag (docker-compose only)                                                 |
+| `CORS_ORIGIN`        | `http://localhost:5432` | Allowed CORS origin for API requests                                                             |
 
 Copy `.env.example` to `.env` and adjust values before running outside Docker Compose.
 

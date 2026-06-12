@@ -1,4 +1,5 @@
 import { execFile, spawn } from 'child_process';
+import { randomUUID } from 'node:crypto';
 import { promisify } from 'util';
 import { pipeline } from 'stream/promises';
 import { createGzip } from 'zlib';
@@ -12,6 +13,12 @@ import { createLogger } from '../logger.js';
 const logger = createLogger('docker');
 
 const execFileAsync = promisify(execFile);
+
+// Pinned scanner image (supply-chain reproducibility); the CVE database itself
+// is still fetched fresh at scan time. `||` so an empty env var falls back.
+const TRIVY_IMAGE = process.env.TRIVY_IMAGE?.trim() || 'aquasec/trivy:0.71.0';
+// Daemon-side named volume persisting the Trivy vuln DB across ephemeral scan containers.
+const TRIVY_CACHE_VOLUME = process.env.TRIVY_CACHE_VOLUME?.trim() || 'trivy-db-cache';
 
 export async function pullImage(image: Image): Promise<void> {
   const ref = `${image.registry}/${image.name}:${image.tag}`;
@@ -27,7 +34,12 @@ export interface TrivyResult {
 
 export async function runTrivy(image: Image): Promise<TrivyResult> {
   const ref = `${image.registry}/${image.name}:${image.tag}`;
-  const reportPath = path.join(os.tmpdir(), `trivy-${image.name.replace(/\//g, '_')}-${image.tag}.json`);
+  // Registry + random suffix keep concurrent scans of the same name:tag from clobbering each other.
+  const safe = (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const reportPath = path.join(
+    os.tmpdir(),
+    `trivy-${safe(image.registry)}-${safe(image.name)}-${safe(image.tag)}-${randomUUID()}.json`
+  );
 
   logger.info('Trivy scan started', { image: ref });
   const trivyStart = Date.now();
@@ -37,7 +49,9 @@ export async function runTrivy(image: Image): Promise<TrivyResult> {
     '--rm',
     '-v',
     '/var/run/docker.sock:/var/run/docker.sock',
-    'aquasec/trivy',
+    '-v',
+    `${TRIVY_CACHE_VOLUME}:/root/.cache/trivy`,
+    TRIVY_IMAGE,
     'image',
     '--format',
     'json',
@@ -79,7 +93,8 @@ export async function runTrivyOnRef(imageRef: string): Promise<VulnerabilityCoun
   const { stdout } = await execFileAsync('docker', [
     'run', '--rm',
     '-v', '/var/run/docker.sock:/var/run/docker.sock',
-    'aquasec/trivy', 'image', '--format', 'json', imageRef,
+    '-v', `${TRIVY_CACHE_VOLUME}:/root/.cache/trivy`,
+    TRIVY_IMAGE, 'image', '--format', 'json', imageRef,
   ], { maxBuffer: 50 * 1024 * 1024 });
 
   const report = JSON.parse(stdout);
