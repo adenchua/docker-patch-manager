@@ -11,8 +11,7 @@ const COPA_TIMEOUT = process.env.COPA_TIMEOUT ?? '10m';
 
 // Schemes accepted by buildkit client connhelpers plus copa's buildx helper.
 // `\S*` (not `\S+`): `buildx://` with no builder name is valid (current builder).
-const BUILDKIT_ADDR_RE =
-  /^(tcp|unix|docker-container|kube-pod|podman-container|nerdctl-container|ssh|buildx):\/\/\S*$/;
+const BUILDKIT_ADDR_RE = /^(tcp|unix|docker-container|kube-pod|podman-container|nerdctl-container|ssh|buildx):\/\/\S*$/;
 
 // Validated at module load so a bad value aborts startup instead of failing on the first patch.
 function resolveBuildkitAddr(): string | undefined {
@@ -43,7 +42,19 @@ export async function patchWithCopa(image: Image, trivyReportPath: string): Prom
   logger.info('Copa patch started', { source: sourceRef, target: patchedRef });
   const copaStart = Date.now();
 
-  const copaArgs = ['patch', '-i', sourceRef, '-r', trivyReportPath, '-t', patchedTag, '--timeout', COPA_TIMEOUT, '--platform', image.architecture];
+  const copaArgs = [
+    'patch',
+    '-i',
+    sourceRef,
+    '-r',
+    trivyReportPath,
+    '-t',
+    patchedTag,
+    '--timeout',
+    COPA_TIMEOUT,
+    '--platform',
+    image.architecture,
+  ];
   if (COPA_BUILDKIT_ADDR) copaArgs.push('--addr', COPA_BUILDKIT_ADDR);
 
   try {
@@ -55,12 +66,24 @@ export async function patchWithCopa(image: Image, trivyReportPath: string): Prom
 
     // Copa exits non-zero when there are no OS-level vulns to patch (only language-level remain)
     if (message.includes('no patchable vulnerabilities') || message.includes('no updates needed')) {
-      logger.warn('Copa: no patchable vulnerabilities, image unchanged', { source: sourceRef, reason: message, durationMs: Date.now() - copaStart });
+      logger.warn('Copa: no patchable vulnerabilities, image unchanged', {
+        source: sourceRef,
+        reason: message,
+        durationMs: Date.now() - copaStart,
+      });
       return { patchedRef: sourceRef, fullyPatched: false };
     }
 
-    if (message.includes('Operation Timed Out') || message.includes('patch exceeded timeout') || message.includes('context canceled')) {
-      logger.error('Copa patch timed out', { source: sourceRef, timeout: COPA_TIMEOUT, durationMs: Date.now() - copaStart });
+    if (
+      message.includes('Operation Timed Out') ||
+      message.includes('patch exceeded timeout') ||
+      message.includes('context canceled')
+    ) {
+      logger.error('Copa patch timed out', {
+        source: sourceRef,
+        timeout: COPA_TIMEOUT,
+        durationMs: Date.now() - copaStart,
+      });
       throw new Error(`Copa timed out (${COPA_TIMEOUT}) for ${sourceRef}`);
     }
 

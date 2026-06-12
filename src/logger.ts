@@ -9,10 +9,7 @@ const consoleFormat = winston.format.combine(
   })
 );
 
-const fileFormat = winston.format.combine(
-  winston.format.timestamp(),
-  winston.format.json()
-);
+const fileFormat = winston.format.combine(winston.format.timestamp(), winston.format.json());
 
 export function createLogger(service: string): winston.Logger {
   return winston.createLogger({

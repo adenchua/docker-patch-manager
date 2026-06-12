@@ -29,7 +29,7 @@ export interface TrivyResult {
   vulnerabilities: VulnerabilityCounts;
   reportPath: string;
   hasOsPackageTypes: boolean; // true if any result has Class === 'os-pkgs'
-  hasOsVulns: boolean;        // true if any os-pkgs result has ≥1 vulnerability
+  hasOsVulns: boolean; // true if any os-pkgs result has ≥1 vulnerability
 }
 
 export async function runTrivy(image: Image): Promise<TrivyResult> {
@@ -44,20 +44,24 @@ export async function runTrivy(image: Image): Promise<TrivyResult> {
   logger.info('Trivy scan started', { image: ref });
   const trivyStart = Date.now();
 
-  const { stdout } = await execFileAsync('docker', [
-    'run',
-    '--rm',
-    '-v',
-    '/var/run/docker.sock:/var/run/docker.sock',
-    '-v',
-    `${TRIVY_CACHE_VOLUME}:/root/.cache/trivy`,
-    TRIVY_IMAGE,
-    'image',
-    '--format',
-    'json',
-    '--list-all-pkgs',
-    ref,
-  ], { maxBuffer: 50 * 1024 * 1024 });
+  const { stdout } = await execFileAsync(
+    'docker',
+    [
+      'run',
+      '--rm',
+      '-v',
+      '/var/run/docker.sock:/var/run/docker.sock',
+      '-v',
+      `${TRIVY_CACHE_VOLUME}:/root/.cache/trivy`,
+      TRIVY_IMAGE,
+      'image',
+      '--format',
+      'json',
+      '--list-all-pkgs',
+      ref,
+    ],
+    { maxBuffer: 50 * 1024 * 1024 }
+  );
 
   await fs.writeFile(reportPath, stdout, 'utf-8');
   const report = JSON.parse(stdout);
@@ -81,7 +85,13 @@ export async function runTrivy(image: Image): Promise<TrivyResult> {
     }
   }
 
-  logger.info('Trivy scan complete', { image: ref, vulnerabilities: counts, hasOsPackageTypes, hasOsVulns, durationMs: Date.now() - trivyStart });
+  logger.info('Trivy scan complete', {
+    image: ref,
+    vulnerabilities: counts,
+    hasOsPackageTypes,
+    hasOsVulns,
+    durationMs: Date.now() - trivyStart,
+  });
 
   return { vulnerabilities: counts, reportPath, hasOsPackageTypes, hasOsVulns };
 }
@@ -90,12 +100,23 @@ export async function runTrivyOnRef(imageRef: string): Promise<VulnerabilityCoun
   logger.info('Trivy post-patch scan started', { image: imageRef });
   const start = Date.now();
 
-  const { stdout } = await execFileAsync('docker', [
-    'run', '--rm',
-    '-v', '/var/run/docker.sock:/var/run/docker.sock',
-    '-v', `${TRIVY_CACHE_VOLUME}:/root/.cache/trivy`,
-    TRIVY_IMAGE, 'image', '--format', 'json', imageRef,
-  ], { maxBuffer: 50 * 1024 * 1024 });
+  const { stdout } = await execFileAsync(
+    'docker',
+    [
+      'run',
+      '--rm',
+      '-v',
+      '/var/run/docker.sock:/var/run/docker.sock',
+      '-v',
+      `${TRIVY_CACHE_VOLUME}:/root/.cache/trivy`,
+      TRIVY_IMAGE,
+      'image',
+      '--format',
+      'json',
+      imageRef,
+    ],
+    { maxBuffer: 50 * 1024 * 1024 }
+  );
 
   const report = JSON.parse(stdout);
   const counts: VulnerabilityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
@@ -109,7 +130,11 @@ export async function runTrivyOnRef(imageRef: string): Promise<VulnerabilityCoun
     }
   }
 
-  logger.info('Trivy post-patch scan complete', { image: imageRef, vulnerabilities: counts, durationMs: Date.now() - start });
+  logger.info('Trivy post-patch scan complete', {
+    image: imageRef,
+    vulnerabilities: counts,
+    durationMs: Date.now() - start,
+  });
   return counts;
 }
 

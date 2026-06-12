@@ -1,7 +1,14 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs/promises';
 import semver from 'semver';
-import { getAllImages, getImage, upsertImage, removeImageById, getImageById, outputPath } from '../services/database.js';
+import {
+  getAllImages,
+  getImage,
+  upsertImage,
+  removeImageById,
+  getImageById,
+  outputPath,
+} from '../services/database.js';
 import { patchImage } from '../services/patcher.js';
 import { Image, ImageStatus } from '../types/index.js';
 import { createLogger } from '../logger.js';
@@ -22,8 +29,13 @@ function isValidRegistry(registry: string): boolean {
   return true;
 }
 const ARCH_ALLOWLIST = new Set([
-  'linux/amd64', 'linux/arm64', 'linux/arm/v7',
-  'linux/arm/v6', 'linux/386', 'linux/ppc64le', 'linux/s390x',
+  'linux/amd64',
+  'linux/arm64',
+  'linux/arm/v7',
+  'linux/arm/v6',
+  'linux/386',
+  'linux/ppc64le',
+  'linux/s390x',
 ]);
 
 const router = Router();
@@ -80,7 +92,10 @@ router.post('/', async (req: Request, res: Response) => {
   const savedImage = (await getImage(name, tag, registry, architecture))!;
   res.status(201).json(savedImage);
   patchImage(savedImage).catch((err) =>
-    logger.warn('Background patch failed', { image: `${savedImage.registry}/${savedImage.name}:${savedImage.tag}`, err: String(err) })
+    logger.warn('Background patch failed', {
+      image: `${savedImage.registry}/${savedImage.name}:${savedImage.tag}`,
+      err: String(err),
+    })
   );
 });
 

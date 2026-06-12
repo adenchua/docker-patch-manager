@@ -115,9 +115,7 @@ export async function patchImage(image: Image): Promise<Image> {
     }
     logger.error('Patch cycle failed', { image: `${image.registry}/${image.name}:${image.tag}`, err: String(err) });
     image = { ...image, status: 'failed' };
-    await updateImage(image).catch((dbErr) =>
-      logger.error('Failed to persist failed status', { err: String(dbErr) })
-    );
+    await updateImage(image).catch((dbErr) => logger.error('Failed to persist failed status', { err: String(dbErr) }));
     throw err;
   } finally {
     activePatches.delete(id);

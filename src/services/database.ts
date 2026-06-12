@@ -116,9 +116,7 @@ export async function initDatabase(): Promise<void> {
 
   // Reset transient states left over from a previous crash or restart so the
   // scheduler can pick them up again.
-  await run(
-    `UPDATE images SET status = 'pending' WHERE status IN ('downloading', 'scanning', 'patching')`
-  );
+  await run(`UPDATE images SET status = 'pending' WHERE status IN ('downloading', 'scanning', 'patching')`);
 }
 
 export async function getAllImages(): Promise<Image[]> {
@@ -212,10 +210,12 @@ export async function removeImage(
 ): Promise<Image | null> {
   const existing = await getImage(name, tag, registry, architecture);
   if (!existing) return null;
-  await run(
-    'DELETE FROM images WHERE name = ? AND tag = ? AND registry = ? AND architecture = ?',
-    [name, tag, registry, architecture]
-  );
+  await run('DELETE FROM images WHERE name = ? AND tag = ? AND registry = ? AND architecture = ?', [
+    name,
+    tag,
+    registry,
+    architecture,
+  ]);
   return existing;
 }
 
