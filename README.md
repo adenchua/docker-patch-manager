@@ -56,6 +56,7 @@ Images with `ready-unpatched` status are saved to the output directory unchanged
 ## Quick Start
 
 ```bash
+export DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)  # non-root container user needs the socket's group
 docker compose up --build
 ```
 
@@ -75,10 +76,14 @@ Patched image tars are written to `./output/` on the host, organized by architec
 
 ## Security & Deployment
 
-- **No built-in authentication.** Anyone who can reach the port can add images and trigger scans. Run the service on a trusted internal network only, or place it behind a reverse proxy (nginx, Traefik, Caddy) that terminates TLS and enforces authentication.
-- **The container is root-equivalent on the host.** It mounts the host Docker socket (`/var/run/docker.sock`), which grants full control of the Docker daemon. Never expose this service to the public internet.
-- The `patch-manager` container itself runs unprivileged — only the `buildkitd` sidecar needs `privileged: true`.
-- The Trivy scanner image and BuildKit sidecar are version-pinned (`TRIVY_IMAGE`, `BUILDKIT_VERSION`) for supply-chain reproducibility. Pinning freezes the scanner _binary_ only — the CVE database is still downloaded fresh at scan time (and cached in the `trivy-db-cache` volume). Bump the pins periodically.
+- **No built-in authentication.** The compose file therefore binds the API to `127.0.0.1` only — it is unreachable from other machines by default. If you need remote access, do **not** widen the port binding; place the service behind a reverse proxy (nginx, Traefik, Caddy) that terminates TLS and enforces authentication.
+- **The container is root-equivalent on the host.** It mounts the host Docker socket (`/var/run/docker.sock`), which grants full control of the Docker daemon. The ephemeral Trivy scan containers also receive the socket. Never expose this service to the public internet.
+- **The app runs as the non-root `node` user.** Socket access is granted via `group_add` in `docker-compose.yml` — set `DOCKER_GID` to the GID of your host's Docker socket (`stat -c '%g' /var/run/docker.sock`). The bind-mounted `./database/` and `./output/` directories must be writable by uid 1000.
+- The `patch-manager` container itself runs unprivileged — only the `buildkitd` sidecar needs `privileged: true`. The sidecar's BuildKit daemon has no TLS or auth, so it must stay on the internal compose network; never publish its port.
+- Set `ALLOWED_REGISTRIES` to restrict which registries `POST /images` accepts. Left unset, any hostname is allowed, meaning API callers can make the server contact arbitrary (including internal) hosts and pull images from them.
+- The Copa binary download is verified against a pinned SHA-256 (`COPA_SHA256`, from the release's `copacetic_checksums.txt`) at image build time.
+- The Trivy scanner image and BuildKit sidecar are version-pinned (`TRIVY_IMAGE`, `BUILDKIT_VERSION`) for supply-chain reproducibility. Pinning freezes the scanner _binary_ only — the CVE database is still downloaded fresh at scan time (and cached in the `trivy-db-cache` volume). Bump the pins periodically. For stricter guarantees, pin `node`, `moby/buildkit`, and `aquasec/trivy` by digest (`image@sha256:…`) instead of by tag.
+- The Swagger UI at `/docs` can be disabled with `ENABLE_DOCS=false`.
 
 ## Configuration
 
@@ -93,6 +98,10 @@ Patched image tars are written to `./output/` on the host, organized by architec
 | `TRIVY_CACHE_VOLUME` | `trivy-db-cache`        | Docker named volume caching the Trivy vulnerability DB between scans                                                                                                                                    |
 | `BUILDKIT_VERSION`   | `v0.30.0`               | BuildKit sidecar image tag (docker-compose only)                                                                                                                                                        |
 | `CORS_ORIGIN`        | `http://localhost:5432` | Allowed CORS origin for API requests                                                                                                                                                                    |
+| `COPA_SHA256`        | _(0.14.1 amd64 hash)_   | Expected SHA-256 of the Copa release tarball, verified at image build; update together with `COPA_VERSION`                                                                                              |
+| `DOCKER_GID`         | `999`                   | GID of the host Docker socket group, granted to the non-root container user (`stat -c '%g' /var/run/docker.sock`)                                                                                       |
+| `ALLOWED_REGISTRIES` | _(unset)_               | Comma-separated registries `POST /images` accepts (e.g. `docker.io,ghcr.io`); unset = any registry, with a startup warning                                                                              |
+| `ENABLE_DOCS`        | `true`                  | Set to `false` to disable the Swagger UI at `/docs`                                                                                                                                                     |
 
 Copy `.env.example` to `.env` and adjust values before running outside Docker Compose.
 

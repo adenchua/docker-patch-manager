@@ -3,6 +3,8 @@ services:
     image: moby/buildkit:${BUILDKIT_VERSION:-v0.30.0}
     privileged: true
     restart: unless-stopped
+    # Privileged daemon with no TLS/auth — it must stay reachable only on the
+    # internal compose network. Never add a `ports:` entry for this service.
     command: --addr tcp://0.0.0.0:1234 --oci-worker-snapshotter=native
 
   patch-manager:
@@ -10,6 +12,12 @@ services:
       context: .
       args:
         COPA_VERSION: ${COPA_VERSION:-0.14.1}
+        COPA_SHA256: ${COPA_SHA256:-a780f62c054f60cd1aecbbf4a4b2665a816aa852534e6b0b9592cf96a327fdc9}
+    # The container runs as the non-root `node` user; membership in the host
+    # docker socket's group is required to talk to the daemon.
+    # Find the GID with: stat -c '%g' /var/run/docker.sock
+    group_add:
+      - '${DOCKER_GID:-999}'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./database:/app/database
@@ -22,8 +30,14 @@ services:
       COPA_BUILDKIT_ADDR: tcp://buildkitd:1234
       TRIVY_IMAGE: ${TRIVY_IMAGE:-aquasec/trivy:0.71.0}
       TRIVY_CACHE_VOLUME: ${TRIVY_CACHE_VOLUME:-trivy-db-cache}
+      ALLOWED_REGISTRIES: ${ALLOWED_REGISTRIES:-}
+      ENABLE_DOCS: ${ENABLE_DOCS:-true}
     depends_on:
       - buildkitd
     ports:
-      - '${PORT:-5432}:${PORT:-5432}'
+      # Loopback-only on purpose: the API has no authentication and controls
+      # the host Docker daemon via the mounted socket (root-equivalent). For
+      # remote access, front it with an authenticating TLS reverse proxy
+      # instead of widening this binding.
+      - '127.0.0.1:${PORT:-5432}:${PORT:-5432}'
     restart: unless-stopped

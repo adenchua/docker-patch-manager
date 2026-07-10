@@ -17,7 +17,21 @@ const logger = createLogger('images');
 
 const NAME_RE = /^[a-zA-Z0-9._\-\/]{1,128}$/;
 const TAG_RE = /^[a-zA-Z0-9._\-]{1,128}$/;
-const REGISTRY_RE = /^[a-zA-Z0-9.\-]+(?::(\d{1,5}))?$/;
+// First character must be alphanumeric so a composed image ref can never
+// start with '-' and be misread as a CLI flag by docker/copa.
+const REGISTRY_RE = /^[a-zA-Z0-9][a-zA-Z0-9.\-]*(?::(\d{1,5}))?$/;
+
+const ALLOWED_REGISTRIES = new Set(
+  (process.env['ALLOWED_REGISTRIES'] ?? '')
+    .split(',')
+    .map((r) => r.trim())
+    .filter(Boolean)
+);
+if (ALLOWED_REGISTRIES.size === 0) {
+  logger.warn(
+    'ALLOWED_REGISTRIES is not set — POST /images will accept any registry hostname, letting callers point this server at arbitrary hosts'
+  );
+}
 
 function isValidRegistry(registry: string): boolean {
   const m = REGISTRY_RE.exec(registry);
@@ -63,6 +77,10 @@ router.post('/', async (req: Request, res: Response) => {
   }
   if (!isValidRegistry(registry)) {
     res.status(400).json({ error: 'registry format is invalid' });
+    return;
+  }
+  if (ALLOWED_REGISTRIES.size > 0 && !ALLOWED_REGISTRIES.has(registry)) {
+    res.status(400).json({ error: `registry must be one of: ${[...ALLOWED_REGISTRIES].join(', ')}` });
     return;
   }
   if (!ARCH_ALLOWLIST.has(architecture)) {

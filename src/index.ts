@@ -50,7 +50,9 @@ const scanLimiter = rateLimit({
 app.use('/scan', scanLimiter);
 
 // 5. Routes
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
+if (process.env.ENABLE_DOCS !== 'false') {
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
+}
 app.get('/health', (_req, res) => {
   res.send('OK');
 });
